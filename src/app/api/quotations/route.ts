@@ -91,8 +91,20 @@ export async function POST(request: Request) {
 
         const supabase = getServerSupabase();
 
-        // Resolve vendor details and node_id
-        const targetVendorId = vendor_id || 'a0000000-0000-0000-0000-000000000001';
+        // Enforce tenant scoping for non-admin users
+        let targetVendorId = vendor_id || 'a0000000-0000-0000-0000-000000000001';
+        if (authUser) {
+            const { data: vUser } = await supabase
+                .from('vendor_users')
+                .select('vendor_id, role')
+                .eq('id', authUser.id)
+                .single();
+
+            if (vUser && vUser.role !== 'super_admin' && vUser.vendor_id) {
+                targetVendorId = vUser.vendor_id;
+            }
+        }
+
         let vendorNodeId = 'NODE-VNS-001';
         let vendorSnapshot: any = null;
 
@@ -183,6 +195,7 @@ export async function POST(request: Request) {
                 components: components || null,
                 savings_data: savings,
                 salesperson: salesperson || null,
+                created_by: authUser.id,
                 status: status || 'draft',
                 pdf_url: pdf_url || null,
                 pdf_storage_path: pdf_storage_path || null,

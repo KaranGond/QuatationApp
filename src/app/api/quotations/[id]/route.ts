@@ -23,6 +23,22 @@ export async function GET(request: Request, context: RouteContext) {
             .single();
 
         if (error) throw error;
+        if (!data) {
+            return NextResponse.json({ success: false, message: 'Quotation not found' }, { status: 404 });
+        }
+
+        // Enforce tenant authorization for non-admin users
+        const { data: vUser } = await supabase
+            .from('vendor_users')
+            .select('vendor_id, role')
+            .eq('id', authUser.id)
+            .single();
+
+        if (vUser && vUser.role !== 'super_admin' && vUser.vendor_id) {
+            if (data.vendor_id !== vUser.vendor_id && data.tenant_id !== vUser.vendor_id) {
+                return NextResponse.json({ success: false, message: 'Access denied: quotation belongs to another tenant' }, { status: 403 });
+            }
+        }
 
         return NextResponse.json({ success: true, data });
     } catch (error) {
@@ -39,6 +55,27 @@ export async function PUT(request: Request, context: RouteContext) {
         }
 
         const { id } = await context.params;
+        const supabase = getServerSupabase();
+
+        // Enforce tenant authorization for non-admin users
+        const { data: vUser } = await supabase
+            .from('vendor_users')
+            .select('vendor_id, role')
+            .eq('id', authUser.id)
+            .single();
+
+        if (vUser && vUser.role !== 'super_admin' && vUser.vendor_id) {
+            const { data: existingQuote } = await supabase
+                .from('quotations')
+                .select('vendor_id, tenant_id')
+                .eq('id', id)
+                .single();
+
+            if (existingQuote && existingQuote.vendor_id !== vUser.vendor_id && existingQuote.tenant_id !== vUser.vendor_id) {
+                return NextResponse.json({ success: false, message: 'Access denied: cannot modify another tenant quotation' }, { status: 403 });
+            }
+        }
+
         const body = await request.json();
         const {
             customer_name,
@@ -74,8 +111,6 @@ export async function PUT(request: Request, context: RouteContext) {
             central_subsidy,
             state_subsidy
         );
-
-        const supabase = getServerSupabase();
 
         // Build update object — only include fields that are provided
         const updateData: any = {
@@ -135,6 +170,25 @@ export async function DELETE(request: Request, context: RouteContext) {
 
         const { id } = await context.params;
         const supabase = getServerSupabase();
+
+        // Enforce tenant authorization for non-admin users
+        const { data: vUser } = await supabase
+            .from('vendor_users')
+            .select('vendor_id, role')
+            .eq('id', authUser.id)
+            .single();
+
+        if (vUser && vUser.role !== 'super_admin' && vUser.vendor_id) {
+            const { data: existingQuote } = await supabase
+                .from('quotations')
+                .select('vendor_id, tenant_id')
+                .eq('id', id)
+                .single();
+
+            if (existingQuote && existingQuote.vendor_id !== vUser.vendor_id && existingQuote.tenant_id !== vUser.vendor_id) {
+                return NextResponse.json({ success: false, message: 'Access denied: cannot delete another tenant quotation' }, { status: 403 });
+            }
+        }
 
         const { error } = await supabase
             .from('quotations')
