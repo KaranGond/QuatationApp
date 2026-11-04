@@ -22,10 +22,19 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import { useAuth } from '@/context/AuthContext';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function VendorProfilePage() {
+    return (
+        <AuthGuard>
+            <VendorProfileContent />
+        </AuthGuard>
+    );
+}
+
+function VendorProfileContent() {
     const router = useRouter();
-    const { user, vendor, refreshVendor, loading: authLoading } = useAuth();
+    const { vendor, refreshVendor } = useAuth();
 
     const [saving, setSaving] = useState(false);
     const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -66,11 +75,6 @@ export default function VendorProfilePage() {
     const qrInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        if (!authLoading && !user) {
-            router.push('/login');
-            return;
-        }
-
         if (vendor) {
             setName(vendor.name || '');
             setTagline(vendor.tagline || '');
@@ -94,7 +98,7 @@ export default function VendorProfilePage() {
             setStampUrl(vendor.stamp_url || '/stamp.png');
             setQrCodeUrl(vendor.qr_code_url || '');
         }
-    }, [user, vendor, authLoading, router]);
+    }, [vendor]);
 
     // Handle Asset Upload to Supabase Storage Bucket 'vendor-assets' (sandboxed by node_id)
     const handleFileUpload = async (file: File, type: 'logo' | 'signature' | 'stamp' | 'qr') => {
@@ -569,7 +573,7 @@ export default function VendorProfilePage() {
                                         label="UPI ID / VPA"
                                         value={upiId}
                                         onChange={(e) => setUpiId(e.target.value)}
-                                        placeholder="karan.solar@hdfcbank"
+                                        placeholder="merchant@bank"
                                     />
                                 </Grid>
                             </Grid>

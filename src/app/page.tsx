@@ -55,6 +55,7 @@ import {
   Login as LoginIcon,
 } from "@mui/icons-material";
 import { useAuth } from "@/context/AuthContext";
+import AuthGuard from "@/components/AuthGuard";
 import { useReactToPrint } from "react-to-print";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -112,9 +113,11 @@ const inverterBrands = ["Polycab", "Shakti", "Growatt", "Sungrow", "Huawei", "De
 // Wrapper with Suspense for useSearchParams
 export default function QuotationBuilderPage() {
   return (
-    <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><Typography>Loading...</Typography></Box>}>
-      <QuotationBuilder />
-    </Suspense>
+    <AuthGuard>
+      <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><Typography>Loading...</Typography></Box>}>
+        <QuotationBuilder />
+      </Suspense>
+    </AuthGuard>
   );
 }
 
@@ -142,8 +145,8 @@ function QuotationBuilder() {
     if (list.some(v => v.id === id)) return id;
     const match = list.find(v =>
       v.slug === id ||
-      (id === 'arpit' && (v.slug === 'arpit-solar' || v.name?.toLowerCase().includes('arpit'))) ||
-      (id === 'karan' && (v.slug === 'karan-solar' || v.name?.toLowerCase().includes('karan')))
+      v.id === id ||
+      (id && v.name && v.name.toLowerCase().includes(id.toLowerCase()))
     );
     return match ? match.id : '';
   }, []);

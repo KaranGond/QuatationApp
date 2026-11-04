@@ -5,24 +5,28 @@ import { createClient } from '@supabase/supabase-js';
 // Tracks full message lifecycle: enqueued → sent → delivered → read / failed
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
+    // 1. Webhook Secret Verification (if configured in environment)
+    const expectedSecret = process.env.DOUBLETICK_WEBHOOK_SECRET;
+    if (expectedSecret) {
+      const authHeader = request.headers.get('authorization') || '';
+      const secretHeader = request.headers.get('x-doubletick-secret') || '';
+      const { searchParams } = new URL(request.url);
+      const querySecret = searchParams.get('secret') || searchParams.get('token') || '';
 
-    console.log('\n--- 🔔 DOUBLETICK WEBHOOK RECEIVED ---');
-    console.log('Event:', payload.event);
-    console.log('Full payload:', JSON.stringify(payload, null, 2));
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+      const isValid = token === expectedSecret || secretHeader === expectedSecret || querySecret === expectedSecret;
+
+      if (!isValid) {
+        return NextResponse.json({ error: 'Unauthorized webhook access' }, { status: 401 });
+      }
+    }
+
+    const payload = await request.json();
 
     if (payload.event === 'MESSAGE_STATUS_UPDATE') {
       const status = payload.data?.status?.toLowerCase() || '';
       let recipient = payload.data?.recipient || payload.data?.to || "";
-      const messageId = payload.data?.messageId || payload.data?.id || "";
       const errorReason = payload.data?.error?.message || payload.data?.errorReason || '';
-      const timestamp = new Date().toISOString();
-
-      // Log every status transition for debugging
-      console.log(`📱 [${timestamp}] Message ${messageId} to ${recipient}: STATUS = ${status}`);
-      if (errorReason) {
-        console.log(`   ⚠️ Error: ${errorReason}`);
-      }
 
       // Normalize phone number - strip country code for DB lookup
       if (recipient.startsWith('+91')) {
@@ -37,27 +41,24 @@ export async function POST(request: Request) {
         case 'enqueued':
         case 'queued':
           dbStatus = 'Queued';
-          console.log(`📤 Message queued for delivery to ${recipient}`);
           break;
         case 'sent':
           dbStatus = 'Sent';
-          console.log(`✉️ Message sent to WhatsApp servers for ${recipient}`);
           break;
         case 'delivered':
           dbStatus = 'Delivered';
-          console.log(`✅ Message delivered to ${recipient}'s device`);
           break;
         case 'read':
           dbStatus = 'Read';
-          console.log(`👀 Message read by ${recipient}`);
           break;
         case 'failed':
         case 'undeliverable':
           dbStatus = 'Failed Delivery';
-          console.error(`🚨 WhatsApp Delivery FAILED to ${recipient}: ${errorReason}`);
+          if (errorReason) {
+            console.warn(`WhatsApp delivery failed: ${errorReason}`);
+          }
           break;
         default:
-          console.log(`❓ Unknown status "${status}" for ${recipient}`);
           break;
       }
 
@@ -89,21 +90,10 @@ export async function POST(request: Request) {
 
             if (updateError) {
               console.error("Failed to update quotation status:", updateError.message);
-            } else {
-              console.log(`✅ Updated quotation ${latestQuote.id} status to '${dbStatus}' for phone ending ${last10}`);
             }
           }
-        } else {
-          console.warn("⚠️ Missing Supabase environment variables - cannot update DB status");
         }
       }
-    }
-
-    // Handle incoming messages (optional - useful for debugging)
-    if (payload.event === 'INCOMING_MESSAGE') {
-      const from = payload.data?.from || '';
-      const text = payload.data?.text || payload.data?.body || '';
-      console.log(`📩 Incoming message from ${from}: ${text.substring(0, 100)}`);
     }
 
     // Always return 200 OK to acknowledge receipt of the webhook
@@ -111,7 +101,7 @@ export async function POST(request: Request) {
 
   } catch (error: unknown) {
     console.error('Webhook processing error:', (error as Error)?.message || error);
-    // Still return 200 to prevent DoubleTick from retrying
+    // Still return 200 to prevent DoubleTick from retrying continuously on malformed payload
     return NextResponse.json({ error: 'Failed to process webhook', received: true }, { status: 200 });
   }
 }

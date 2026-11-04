@@ -7,6 +7,7 @@ import { sendWhatsAppMessage } from '../../../lib/whatsapp';
 import { generateQuoteHtml } from '../../../lib/quoteTemplate';
 import { defaultComponents } from '@/lib/companyDetails';
 import { GST_RATE } from '../../../data/priceList';
+import { getAuthenticatedUser } from '@/lib/authGuard';
 
 export const runtime = 'nodejs';
 
@@ -14,6 +15,11 @@ export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
+    const authUser = await getAuthenticatedUser(request);
+    if (!authUser) {
+      return NextResponse.json({ message: 'Authentication required' }, { status: 401 });
+    }
+
     const quoteData = await request.json();
 
     if (!quoteData?.customerInfo?.name) {
@@ -61,7 +67,9 @@ export async function POST(request: Request) {
       console.warn('Falling back to origin logo URL', logoError);
     }
 
-    const upiLink = `upi://pay?pa=${quoteData.companyDetails?.bank?.upiId || 'karan.solar@hdfcbank'}&pn=${encodeURIComponent(quoteData.companyDetails?.name || 'Karan Solar Shop')}&am=${grandTotal}&cu=INR`;
+    const upiPa = quoteData.companyDetails?.bank?.upiId || quoteData.companyDetails?.upi_id || '';
+    const upiPn = encodeURIComponent(quoteData.companyDetails?.name || 'Solar Quotation');
+    const upiLink = upiPa ? `upi://pay?pa=${upiPa}&pn=${upiPn}&am=${grandTotal}&cu=INR` : '';
 
     // Load Payment QR Code (custom vendor QR or fallback to static payment.png)
     let qrCodeUrl = quoteData.companyDetails?.qr_code_url || '';
@@ -127,10 +135,11 @@ export async function POST(request: Request) {
       });
     } else {
       const { default: puppeteer } = await import('puppeteer');
+      const customChrome = process.env.CHROME_PATH || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : undefined);
       browser = await puppeteer.launch({
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        ...(customChrome ? { executablePath: customChrome } : {}),
       });
     }
     let pdfBuffer: Buffer | Uint8Array;

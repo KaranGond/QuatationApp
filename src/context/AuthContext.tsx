@@ -50,6 +50,17 @@ const DEFAULT_FALLBACK_VENDOR: Vendor = {
     updated_at: "2026-10-22T11:05:49.814575+00:00",
 };
 
+const syncAuthCookie = (token: string | null) => {
+    if (typeof document === 'undefined') return;
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const secureFlag = isHttps ? '; Secure' : '';
+    if (token) {
+        document.cookie = `sb-access-token=${token}; path=/; max-age=604800; SameSite=Lax${secureFlag}`;
+    } else {
+        document.cookie = `sb-access-token=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
+    }
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<any | null>(null);
     const [vendor, setVendor] = useState<Vendor | null>(DEFAULT_FALLBACK_VENDOR);
@@ -158,11 +169,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // Run once on mount
         supabase.auth.getSession().then(({ data: { session } }) => {
+            syncAuthCookie(session?.access_token || null);
             loadUserDataRef.current(session?.user || null);
         });
 
         // Listen for auth changes (single subscription)
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            syncAuthCookie(session?.access_token || null);
             loadUserDataRef.current(session?.user || null);
         });
 
@@ -194,6 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const signOut = async () => {
         await supabase.auth.signOut();
+        syncAuthCookie(null);
         setUser(null);
         setRole(null);
         if (allVendors.length > 0) {

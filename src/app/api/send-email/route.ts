@@ -1,13 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import { getAuthenticatedUser } from "@/lib/authGuard";
+import { getServerSupabase } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
     try {
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: "Authentication required" }, { status: 401 });
+        }
+
         const body = await request.json();
-        const { email, subject, quotationData } = body;
+        const { email, subject, quotationData, vendor_id } = body;
 
         if (!email) {
             return NextResponse.json({ success: false, message: "Email address is required" }, { status: 400 });
+        }
+
+        // Resolve vendor details dynamically for multi-tenant branding
+        let vendorName = "Solar Shop";
+        let vendorPhone = "";
+        let vendorEmail = "";
+
+        if (vendor_id) {
+            try {
+                const supabase = getServerSupabase();
+                const { data: vendorData } = await supabase
+                    .from('vendors')
+                    .select('name, phone, email')
+                    .eq('id', vendor_id)
+                    .single();
+                if (vendorData) {
+                    vendorName = vendorData.name || vendorName;
+                    vendorPhone = vendorData.phone || "";
+                    vendorEmail = vendorData.email || "";
+                }
+            } catch {
+                // Fallback to defaults
+            }
         }
 
         // For now, we'll return instructions to configure email
@@ -23,7 +53,7 @@ export async function POST(request: NextRequest) {
 
             const emailBody = `Dear ${customerName || "Customer"},
 
-Thank you for your interest in solar power! Here's your quotation from Karan Solar Shop.
+Thank you for your interest in solar power! Here's your quotation from ${vendorName}.
 
 SYSTEM DETAILS
 - System Size: ${systemSize} KW
@@ -40,9 +70,7 @@ PM SURYA GHAR SUBSIDY
 EFFECTIVE COST: ₹${new Intl.NumberFormat("en-IN").format(effectiveCost || 0)}
 
 ---
-KARAN SOLAR SHOP
-Contact: +91 9005770466
-Email: karangond221998@gmail.com
+${vendorName}${vendorPhone ? `\nContact: ${vendorPhone}` : ""}${vendorEmail ? `\nEmail: ${vendorEmail}` : ""}
 
 This quotation is valid for 7 days.`;
 
@@ -86,7 +114,7 @@ This quotation is valid for 7 days.`;
 </head>
 <body>
   <div class="header">
-    <h1>KARAN SOLAR SHOP</h1>
+    <h1>${vendorName.toUpperCase()}</h1>
     <p>Solar Quotation</p>
   </div>
   <div class="content">
@@ -113,14 +141,14 @@ This quotation is valid for 7 days.`;
     <p>This quotation is valid for 7 days.</p>
   </div>
   <div class="footer">
-    <p>KARAN SOLAR SHOP</p>
-    <p>Contact: +91 9005770466 | Email: karangond221998@gmail.com</p>
+    <p>${vendorName.toUpperCase()}</p>
+    <p>${vendorPhone ? `Contact: ${vendorPhone}` : ""}${vendorPhone && vendorEmail ? " | " : ""}${vendorEmail ? `Email: ${vendorEmail}` : ""}</p>
   </div>
 </body>
 </html>`;
 
         await transporter.sendMail({
-            from: `"Karan Solar Shop" <${smtpUser}>`,
+            from: `"${vendorName}" <${smtpUser}>`,
             to: email,
             subject: subject || `Solar Quotation - ${customerName || "Customer"}`,
             html: htmlContent

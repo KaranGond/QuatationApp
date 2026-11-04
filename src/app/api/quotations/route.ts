@@ -55,6 +55,11 @@ export async function GET(request: Request) {
 // POST - Create new quotation with atomic tenant sequence number
 export async function POST(request: Request) {
     try {
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
+        }
+
         const body = await request.json();
         const {
             vendor_id,

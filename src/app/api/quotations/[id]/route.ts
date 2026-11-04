@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
 import { gstConfig, calculateSavings } from '@/lib/companyDetails';
+import { getAuthenticatedUser } from '@/lib/authGuard';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 // GET - Get single quotation
 export async function GET(request: Request, context: RouteContext) {
     try {
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
+        }
+
         const { id } = await context.params;
         const supabase = getServerSupabase();
 
@@ -27,6 +33,11 @@ export async function GET(request: Request, context: RouteContext) {
 // PUT - Update quotation
 export async function PUT(request: Request, context: RouteContext) {
     try {
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
+        }
+
         const { id } = await context.params;
         const body = await request.json();
         const {
@@ -117,6 +128,11 @@ export async function PUT(request: Request, context: RouteContext) {
 // DELETE - Delete quotation
 export async function DELETE(request: Request, context: RouteContext) {
     try {
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
+        }
+
         const { id } = await context.params;
         const supabase = getServerSupabase();
 

@@ -1338,7 +1338,7 @@ export default function AdminVendorsPage() {
                                 <TextField fullWidth label="Company / Shop Name *" value={modalName} onChange={(e) => setModalName(e.target.value)} required />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField fullWidth label="Authorized Signatory Name" value={modalSignatory} onChange={(e) => setModalSignatory(e.target.value)} placeholder="e.g. Karan Gond" />
+                                <TextField fullWidth label="Authorized Signatory Name" value={modalSignatory} onChange={(e) => setModalSignatory(e.target.value)} placeholder="e.g. Authorized Signatory" />
                             </Grid>
 
                             {/* Multi-Tenant Node ID & Prefix Configuration */}

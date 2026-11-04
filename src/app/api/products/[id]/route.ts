@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
+import { getAuthenticatedUser } from '@/lib/authGuard';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -26,6 +27,11 @@ export async function GET(request: Request, context: RouteContext) {
 // PUT - Update product
 export async function PUT(request: Request, context: RouteContext) {
     try {
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
+        }
+
         const { id } = await context.params;
         const body = await request.json();
         const { system_type_id, name, brand, capacity_kw, phase, base_price, gst_rate, is_active } = body;
@@ -58,6 +64,11 @@ export async function PUT(request: Request, context: RouteContext) {
 // DELETE - Delete product
 export async function DELETE(request: Request, context: RouteContext) {
     try {
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
+        }
+
         const { id } = await context.params;
         const supabase = getServerSupabase();
 

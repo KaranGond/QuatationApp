@@ -1,6 +1,4 @@
 import { getServerSupabase } from './supabase';
-// @ts-expect-error - pg types are optional at build time
-import { Client } from 'pg';
 
 const CITY_CODES: Record<string, string> = {
     varanasi: 'VNS',
@@ -130,6 +128,8 @@ export async function getNextTenantQuoteNumber(tenantId: string): Promise<string
     const databaseUrl = process.env.DATABASE_URL;
     if (databaseUrl) {
         try {
+            // @ts-expect-error - pg is optional at runtime
+            const { Client } = await import('pg');
             const client = new Client({
                 connectionString: databaseUrl,
                 ssl: { rejectUnauthorized: false },

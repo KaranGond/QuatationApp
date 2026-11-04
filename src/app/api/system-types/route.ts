@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
 import { defaultTerms } from '@/lib/companyDetails';
+import { getAuthenticatedUser } from '@/lib/authGuard';
 
 // GET - List all system types
 export async function GET() {
@@ -29,6 +30,11 @@ export async function GET() {
 // POST - Create new system type
 export async function POST(request: Request) {
     try {
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
+        }
+
         const body = await request.json();
         const { name, description } = body;
 

@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthenticatedUser } from "@/lib/authGuard";
+import { getServerSupabase } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { phone, quotationData } = body;
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: "Authentication required" }, { status: 401 });
+        }
 
-        console.log("=== WhatsApp API ===");
-        console.log("Phone:", phone);
+        const body = await request.json();
+        const { phone, quotationData, vendor_id } = body;
 
         if (!phone) {
             return NextResponse.json({ success: false, message: "Phone required" }, { status: 400 });
@@ -17,6 +21,27 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: false, message: "API key missing" }, { status: 500 });
         }
 
+        // Resolve vendor details dynamically for multi-tenant branding
+        let vendorName = "Solar Shop";
+        let vendorPhone = "";
+
+        if (vendor_id) {
+            try {
+                const supabase = getServerSupabase();
+                const { data: vendorData } = await supabase
+                    .from('vendors')
+                    .select('name, phone')
+                    .eq('id', vendor_id)
+                    .single();
+                if (vendorData) {
+                    vendorName = vendorData.name || vendorName;
+                    vendorPhone = vendorData.phone || "";
+                }
+            } catch {
+                // Fallback to defaults
+            }
+        }
+
         // Clean and format phone - need +91 format
         const digits = String(phone).replace(/\D/g, "");
         if (digits.length < 10) {
@@ -24,7 +49,6 @@ export async function POST(request: NextRequest) {
         }
         const last10 = digits.slice(-10);
         const formattedPhone = `+91${last10}`;
-        console.log("Formatted:", formattedPhone);
 
         // Build quotation message
         const {
@@ -38,7 +62,7 @@ export async function POST(request: NextRequest) {
             stateSubsidy = 0
         } = quotationData || {};
 
-        const message = `🌞 *KARAN SOLAR SHOP*
+        const message = `🌞 *${vendorName.toUpperCase()}*
 ━━━━━━━━━━━━━━━━━
 *Solar Quotation*
 
@@ -50,8 +74,7 @@ Dear *${customerName}*,
 💰 *Total: ₹${new Intl.NumberFormat("en-IN").format(totalAmount)}*
 🎁 Subsidy: ₹${new Intl.NumberFormat("en-IN").format(centralSubsidy + stateSubsidy)}
 ✨ *Pay Only: ₹${new Intl.NumberFormat("en-IN").format(effectiveCost)}*
-
-📞 Contact: +91 9005770466
+${vendorPhone ? `\n📞 Contact: ${vendorPhone}` : ""}
 ━━━━━━━━━━━━━━━━━`;
 
         // Try text message first (works if customer messaged within 24hrs)
@@ -59,7 +82,6 @@ Dear *${customerName}*,
             messages: [{ to: formattedPhone, content: { text: message } }]
         };
 
-        console.log("Trying text message...");
         let res = await fetch("https://public.doubletick.io/whatsapp/message/text", {
             method: "POST",
             headers: {
@@ -71,12 +93,9 @@ Dear *${customerName}*,
         });
 
         let data = await res.json();
-        console.log("Text response:", res.status, JSON.stringify(data));
 
         // If text failed, try template message
         if (!res.ok) {
-            console.log("Text failed, trying template...");
-
             // Use the quotation_document template already set up in DoubleTick
             const templatePayload = {
                 messages: [{
@@ -91,8 +110,6 @@ Dear *${customerName}*,
                 }]
             };
 
-            console.log("Template payload:", JSON.stringify(templatePayload));
-
             res = await fetch("https://public.doubletick.io/whatsapp/message/template", {
                 method: "POST",
                 headers: {
@@ -104,7 +121,6 @@ Dear *${customerName}*,
             });
 
             data = await res.json();
-            console.log("Template response:", res.status, JSON.stringify(data));
         }
 
         if (!res.ok) {
@@ -120,7 +136,7 @@ Dear *${customerName}*,
         return NextResponse.json({ success: true, message: `Sent to ${formattedPhone}` });
 
     } catch (err: unknown) {
-        console.error("Error:", err);
+        console.error("WhatsApp API error:", err);
         return NextResponse.json({ success: false, message: (err as Error)?.message || 'Unknown error' }, { status: 500 });
     }
 }

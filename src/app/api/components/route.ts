@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
 import { defaultComponents } from '@/lib/companyDetails';
+import { getAuthenticatedUser } from '@/lib/authGuard';
 
 // GET - List all components (optionally filter by system_type)
 export async function GET(request: Request) {
@@ -52,6 +53,11 @@ export async function GET(request: Request) {
 // POST - Create new component
 export async function POST(request: Request) {
     try {
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
+        }
+
         const body = await request.json();
         const { system_type_id, name, description, default_quantity, default_make, sort_order, is_default } = body;
 
@@ -85,6 +91,11 @@ export async function POST(request: Request) {
 // PUT - Update component
 export async function PUT(request: Request) {
     try {
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
+        }
+
         const body = await request.json();
         const { id, name, description, default_quantity, default_make, sort_order, is_default } = body;
 
@@ -118,6 +129,11 @@ export async function PUT(request: Request) {
 // DELETE - Delete component
 export async function DELETE(request: Request) {
     try {
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
+        }
+
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
 

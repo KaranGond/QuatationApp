@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
+import { getAuthenticatedUser } from '@/lib/authGuard';
 
 // GET - List all products (optionally filter by system_type)
 export async function GET(request: Request) {
@@ -35,6 +36,11 @@ export async function GET(request: Request) {
 // POST - Create new product
 export async function POST(request: Request) {
     try {
+        const authUser = await getAuthenticatedUser(request);
+        if (!authUser) {
+            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
+        }
+
         const body = await request.json();
         const { system_type_id, name, brand, capacity_kw, phase, base_price, gst_rate } = body;
 

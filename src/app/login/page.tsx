@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-    Container,
     Box,
     Card,
     CardContent,
@@ -14,8 +14,6 @@ import {
     CircularProgress,
     InputAdornment,
     IconButton,
-    Chip,
-    Divider,
     Stack
 } from '@mui/material';
 import EmailIcon from '@mui/icons-material/Email';
@@ -23,14 +21,24 @@ import LockIcon from '@mui/icons-material/Lock';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import WbSunnyIcon from '@mui/icons-material/WbSunny';
-import StorefrontIcon from '@mui/icons-material/Storefront';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import LogoutIcon from '@mui/icons-material/Logout';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
+    return (
+        <Suspense fallback={<Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f5f7fa' }}><CircularProgress sx={{ color: '#ff9800' }} /></Box>}>
+            <LoginForm />
+        </Suspense>
+    );
+}
+
+function LoginForm() {
     const router = useRouter();
-    const { signIn, user, vendor, role } = useAuth();
+    const searchParams = useSearchParams();
+    const redirectTo = searchParams.get('redirect');
+    const { signIn, signOut, user, vendor, role } = useAuth();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -53,20 +61,17 @@ export default function LoginPage() {
         if (!res.success) {
             setErrorMsg(res.error || 'Invalid email or password.');
         } else {
-            // Route based on actual resolved user role
-            const effectiveRole = (res as any)?.role || role;
-            if (effectiveRole === 'super_admin') {
-                router.push('/admin');
+            if (redirectTo) {
+                router.push(redirectTo);
             } else {
-                router.push('/vendor/dashboard');
+                const effectiveRole = (res as any)?.role || role;
+                if (effectiveRole === 'super_admin') {
+                    router.push('/admin');
+                } else {
+                    router.push('/vendor/dashboard');
+                }
             }
         }
-    };
-
-    const fillCredentials = (demoEmail: string, demoPass: string) => {
-        setEmail(demoEmail);
-        setPassword(demoPass);
-        setErrorMsg('');
     };
 
     return (
@@ -76,92 +81,125 @@ export default function LoginPage() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: 'linear-gradient(135deg, #0b192c 0%, #1e3e62 50%, #000000 100%)',
+                background: 'linear-gradient(145deg, #f0f4f8 0%, #e2e8f0 50%, #f8fafc 100%)',
                 p: 2,
             }}
         >
-            <Container maxWidth="sm">
-                <Box sx={{ textAlign: 'center', mb: 3 }}>
+            <Box sx={{ width: '100%', maxWidth: 400 }}>
+                {/* Logo & Title */}
+                <Box sx={{ textAlign: 'center', mb: 2.5 }}>
                     <Box
                         sx={{
-                            width: 64,
-                            height: 64,
-                            borderRadius: '50%',
-                            bgcolor: 'rgba(255, 152, 0, 0.15)',
-                            border: '2px solid rgba(255, 152, 0, 0.4)',
+                            width: 48,
+                            height: 48,
+                            borderRadius: '14px',
+                            background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             mb: 1.5,
-                            boxShadow: '0 0 25px rgba(255, 152, 0, 0.3)'
+                            boxShadow: '0 4px 14px rgba(255, 152, 0, 0.35)',
                         }}
                     >
-                        <WbSunnyIcon sx={{ fontSize: 36, color: '#ff9800' }} />
+                        <WbSunnyIcon sx={{ fontSize: 26, color: '#fff' }} />
                     </Box>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: '#fff', letterSpacing: '-0.5px' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: '#1e293b', letterSpacing: '-0.5px' }}>
                         Solar Vendor Portal
                     </Typography>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mt: 0.5 }}>
-                        Multi-Vendor Solar Quotation & Commercial Architecture
+                    <Typography variant="caption" sx={{ color: '#94a3b8', mt: 0.3, display: 'block' }}>
+                        Quotation & Commercial Platform
                     </Typography>
                 </Box>
 
+                {/* Login Card */}
                 <Card
+                    elevation={0}
                     sx={{
-                        borderRadius: 4,
-                        bgcolor: 'rgba(17, 24, 39, 0.85)',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
-                        boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+                        borderRadius: 3,
+                        bgcolor: '#fff',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
                     }}
                 >
-                    <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
+                    <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
                         {user ? (
-                            <Box sx={{ textAlign: 'center', py: 2 }}>
+                            <Box sx={{ textAlign: 'center', py: 1 }}>
                                 <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
-                                    Logged in as <strong>{user.email}</strong> ({role || 'Vendor'})
+                                    Signed in as <strong>{user.email}</strong>
                                 </Alert>
-                                <Typography sx={{ color: '#fff', mb: 2 }}>
-                                    Active Vendor: <strong>{vendor?.name || 'Karan Solar Shop'}</strong>
+                                <Typography variant="body2" sx={{ color: '#475569', mb: 2 }}>
+                                    Vendor: <strong>{vendor?.name || 'Karan Solar Shop'}</strong>
                                 </Typography>
-                                <Stack direction="row" spacing={2} justifyContent="center">
-                                    <Button
-                                        variant="contained"
-                                        onClick={() => router.push('/')}
-                                        endIcon={<ArrowForwardIcon />}
-                                        sx={{ bgcolor: '#ff9800', '&:hover': { bgcolor: '#f57c00' }, fontWeight: 700 }}
-                                    >
-                                        Go to Quotation Builder
-                                    </Button>
-                                    {role === 'super_admin' && (
+                                <Stack spacing={1.5} alignItems="center">
+                                    <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap">
                                         <Button
-                                            variant="outlined"
-                                            onClick={() => router.push('/admin/vendors')}
-                                            sx={{ color: '#ff9800', borderColor: '#ff9800' }}
+                                            component={Link}
+                                            href={redirectTo || '/'}
+                                            variant="contained"
+                                            size="small"
+                                            endIcon={<ArrowForwardIcon />}
+                                            sx={{
+                                                bgcolor: '#ff9800',
+                                                '&:hover': { bgcolor: '#f57c00' },
+                                                fontWeight: 700,
+                                                textTransform: 'none',
+                                                borderRadius: 2,
+                                            }}
                                         >
-                                            Vendor Management
+                                            Quotation Builder
                                         </Button>
-                                    )}
+                                        {role === 'super_admin' && (
+                                            <Button
+                                                component={Link}
+                                                href="/admin/vendors"
+                                                variant="outlined"
+                                                size="small"
+                                                sx={{
+                                                    color: '#475569',
+                                                    borderColor: '#cbd5e1',
+                                                    fontWeight: 600,
+                                                    textTransform: 'none',
+                                                    borderRadius: 2,
+                                                }}
+                                            >
+                                                Manage Vendors
+                                            </Button>
+                                        )}
+                                    </Stack>
+
+                                    <Button
+                                        variant="text"
+                                        size="small"
+                                        color="error"
+                                        startIcon={<LogoutIcon sx={{ fontSize: 16 }} />}
+                                        onClick={async () => {
+                                            await signOut();
+                                        }}
+                                        sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.8rem', mt: 1 }}
+                                    >
+                                        Sign out / Switch account
+                                    </Button>
                                 </Stack>
                             </Box>
                         ) : (
                             <form onSubmit={handleLogin}>
-                                <Typography variant="h6" sx={{ color: '#fff', fontWeight: 700, mb: 1 }}>
-                                    Sign In with ID & Password
+                                <Typography variant="subtitle1" sx={{ color: '#1e293b', fontWeight: 700, mb: 0.3 }}>
+                                    Sign in to your account
                                 </Typography>
-                                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', mb: 3 }}>
-                                    Enter your registered vendor credentials to access your brand quotation generator.
+                                <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 2.5 }}>
+                                    Enter your credentials to continue
                                 </Typography>
 
                                 {errorMsg && (
-                                    <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2 }}>
+                                    <Alert severity="error" sx={{ mb: 2, borderRadius: 2, fontSize: '0.8rem' }}>
                                         {errorMsg}
                                     </Alert>
                                 )}
 
                                 <TextField
                                     fullWidth
-                                    label="Email Address / Vendor ID"
+                                    size="small"
+                                    label="Email"
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
@@ -170,30 +208,36 @@ export default function LoginPage() {
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <EmailIcon sx={{ color: 'rgba(255,255,255,0.5)' }} />
+                                                <EmailIcon sx={{ color: '#94a3b8', fontSize: 18 }} />
                                             </InputAdornment>
                                         ),
                                     }}
                                     sx={{
-                                        mb: 2.5,
-                                        '& .MuiInputBase-root': { bgcolor: 'rgba(255,255,255,0.05)', color: '#fff' },
-                                        '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-                                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' },
+                                        mb: 1.5,
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2,
+                                            bgcolor: '#f8fafc',
+                                            '& fieldset': { borderColor: '#e2e8f0' },
+                                            '&:hover fieldset': { borderColor: '#cbd5e1' },
+                                            '&.Mui-focused fieldset': { borderColor: '#ff9800' },
+                                        },
+                                        '& .MuiInputLabel-root.Mui-focused': { color: '#ff9800' },
                                     }}
                                 />
 
                                 <TextField
                                     fullWidth
+                                    size="small"
                                     label="Password"
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="••••••••••••"
+                                    placeholder="••••••••"
                                     required
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <LockIcon sx={{ color: 'rgba(255,255,255,0.5)' }} />
+                                                <LockIcon sx={{ color: '#94a3b8', fontSize: 18 }} />
                                             </InputAdornment>
                                         ),
                                         endAdornment: (
@@ -201,18 +245,24 @@ export default function LoginPage() {
                                                 <IconButton
                                                     onClick={() => setShowPassword(!showPassword)}
                                                     edge="end"
-                                                    sx={{ color: 'rgba(255,255,255,0.6)' }}
+                                                    size="small"
+                                                    sx={{ color: '#94a3b8' }}
                                                 >
-                                                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                                                    {showPassword ? <VisibilityOff sx={{ fontSize: 18 }} /> : <Visibility sx={{ fontSize: 18 }} />}
                                                 </IconButton>
                                             </InputAdornment>
                                         ),
                                     }}
                                     sx={{
-                                        mb: 3,
-                                        '& .MuiInputBase-root': { bgcolor: 'rgba(255,255,255,0.05)', color: '#fff' },
-                                        '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-                                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' },
+                                        mb: 2.5,
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2,
+                                            bgcolor: '#f8fafc',
+                                            '& fieldset': { borderColor: '#e2e8f0' },
+                                            '&:hover fieldset': { borderColor: '#cbd5e1' },
+                                            '&.Mui-focused fieldset': { borderColor: '#ff9800' },
+                                        },
+                                        '& .MuiInputLabel-root.Mui-focused': { color: '#ff9800' },
                                     }}
                                 />
 
@@ -222,97 +272,28 @@ export default function LoginPage() {
                                     variant="contained"
                                     disabled={loading}
                                     sx={{
-                                        py: 1.4,
+                                        py: 1,
                                         borderRadius: 2,
                                         bgcolor: '#ff9800',
                                         '&:hover': { bgcolor: '#f57c00' },
-                                        fontWeight: 800,
-                                        fontSize: '1rem',
+                                        fontWeight: 700,
+                                        fontSize: '0.875rem',
                                         textTransform: 'none',
-                                        boxShadow: '0 8px 20px rgba(255,152,0,0.3)',
+                                        boxShadow: '0 2px 8px rgba(255,152,0,0.25)',
                                     }}
                                 >
-                                    {loading ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : 'Sign In to Dashboard'}
+                                    {loading ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : 'Sign In'}
                                 </Button>
-
-                                <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.1)' }}>
-                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', px: 1, fontWeight: 700, letterSpacing: '0.5px' }}>
-                                        ONE-CLICK DEMO ACCESS (2 LAYERS)
-                                    </Typography>
-                                </Divider>
-
-                                <Stack spacing={1.5}>
-                                    {/* Layer 1: Developer / Owner */}
-                                    <Box
-                                        onClick={() => fillCredentials('admin@karansolar.com', 'AdminPassword@123')}
-                                        sx={{
-                                            p: 1.5,
-                                            borderRadius: 2,
-                                            bgcolor: 'rgba(33, 150, 243, 0.08)',
-                                            border: '1px solid rgba(33, 150, 243, 0.25)',
-                                            cursor: 'pointer',
-                                            transition: '0.2s',
-                                            '&:hover': { bgcolor: 'rgba(33, 150, 243, 0.15)', borderColor: '#2196f3' },
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                        }}
-                                    >
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                            <AdminPanelSettingsIcon sx={{ color: '#2196f3' }} />
-                                            <Box>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                                                    <Typography variant="subtitle2" sx={{ color: '#fff', fontWeight: 700 }}>
-                                                        Layer 1: Developer Owner
-                                                    </Typography>
-                                                    <Chip label="Platform Owner" size="small" sx={{ bgcolor: 'rgba(33,150,243,0.2)', color: '#60a5fa', fontWeight: 800, fontSize: '0.65rem', height: 18 }} />
-                                                </Box>
-                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-                                                    admin@karansolar.com • Manages all vendors & catalogs
-                                                </Typography>
-                                            </Box>
-                                        </Box>
-                                        <Chip label="Select" size="small" sx={{ bgcolor: '#2196f3', color: '#fff', fontWeight: 700, fontSize: '0.72rem' }} />
-                                    </Box>
-
-                                    {/* Layer 2: Vendor */}
-                                    <Box
-                                        onClick={() => fillCredentials('karan@solar.com', 'VendorPassword@123')}
-                                        sx={{
-                                            p: 1.5,
-                                            borderRadius: 2,
-                                            bgcolor: 'rgba(255, 152, 0, 0.08)',
-                                            border: '1px solid rgba(255, 152, 0, 0.25)',
-                                            cursor: 'pointer',
-                                            transition: '0.2s',
-                                            '&:hover': { bgcolor: 'rgba(255, 152, 0, 0.15)', borderColor: '#ff9800' },
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                        }}
-                                    >
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                            <StorefrontIcon sx={{ color: '#ff9800' }} />
-                                            <Box>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                                                    <Typography variant="subtitle2" sx={{ color: '#fff', fontWeight: 700 }}>
-                                                        Layer 2: Vendor Workspace
-                                                    </Typography>
-                                                    <Chip label="Solar Shop" size="small" sx={{ bgcolor: 'rgba(255,152,0,0.2)', color: '#ffb74d', fontWeight: 800, fontSize: '0.65rem', height: 18 }} />
-                                                </Box>
-                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-                                                    karan@solar.com • Karan Solar Shop (Varanasi)
-                                                </Typography>
-                                            </Box>
-                                        </Box>
-                                        <Chip label="Select" size="small" sx={{ bgcolor: '#ff9800', color: '#fff', fontWeight: 700, fontSize: '0.72rem' }} />
-                                    </Box>
-                                </Stack>
                             </form>
                         )}
                     </CardContent>
                 </Card>
-            </Container>
+
+                {/* Footer */}
+                <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', mt: 2, color: '#94a3b8', fontSize: '0.68rem' }}>
+                    Solar Quotation Platform • Multi-Vendor SaaS
+                </Typography>
+            </Box>
         </Box>
     );
 }

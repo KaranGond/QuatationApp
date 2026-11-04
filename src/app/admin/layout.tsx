@@ -30,8 +30,17 @@ import BuildIcon from '@mui/icons-material/Build';
 import LoginIcon from '@mui/icons-material/Login';
 import WifiOffIcon from '@mui/icons-material/WifiOff';
 import { useAuth } from '@/context/AuthContext';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <AuthGuard>
+            <AdminLayoutInner>{children}</AdminLayoutInner>
+        </AuthGuard>
+    );
+}
+
+function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
     const { user, role, loading, signOut, vendor } = useAuth();

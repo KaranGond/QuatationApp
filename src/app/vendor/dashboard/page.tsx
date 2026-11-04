@@ -22,8 +22,17 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { useAuth } from '@/context/AuthContext';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function VendorDashboardPage() {
+    return (
+        <AuthGuard>
+            <VendorDashboardContent />
+        </AuthGuard>
+    );
+}
+
+function VendorDashboardContent() {
     const router = useRouter();
     const { user, vendor, signOut, loading: authLoading } = useAuth();
 
@@ -36,11 +45,6 @@ export default function VendorDashboardPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!authLoading && !user) {
-            router.push('/login');
-            return;
-        }
-
         const fetchVendorData = async () => {
             if (!vendor?.id) return;
             setLoading(true);

@@ -154,8 +154,9 @@ export default function QuotationsAdminPage() {
         q.system_type_name === "Service";
 
     const filteredQuotations = quotations.filter((q) => {
-        // Vendor filter
-        if (selectedVendorId !== "all" && q.vendor_id !== selectedVendorId) {
+        // Vendor filter (supports either vendor_id or tenant_id field)
+        const quoteVendorId = q.vendor_id || (q as any).tenant_id;
+        if (selectedVendorId !== "all" && quoteVendorId !== selectedVendorId) {
             return false;
         }
 
@@ -389,14 +390,15 @@ export default function QuotationsAdminPage() {
                                                 <TableCell>
                                                     {(() => {
                                                         const v = vendors.find((vend) => vend.id === quotation.vendor_id);
+                                                        const displayName = v ? v.name : (quotation.vendor_id ? quotation.vendor_id : "Standard / Direct");
                                                         return (
                                                             <Chip
                                                                 icon={<Storefront sx={{ fontSize: "14px !important" }} />}
-                                                                label={v ? v.name : (quotation.vendor_id ? quotation.vendor_id : "Karan Solar")}
+                                                                label={displayName}
                                                                 size="small"
                                                                 sx={{
-                                                                    bgcolor: v?.id === 'karan-solar' || !quotation.vendor_id ? '#fff7ed' : '#f0fdf4',
-                                                                    color: v?.id === 'karan-solar' || !quotation.vendor_id ? '#c2410c' : '#15803d',
+                                                                    bgcolor: '#f1f5f9',
+                                                                    color: '#334155',
                                                                     fontWeight: 700,
                                                                     fontSize: '0.72rem',
                                                                     border: '1px solid rgba(0,0,0,0.08)'
