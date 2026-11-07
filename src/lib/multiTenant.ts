@@ -1,4 +1,4 @@
-import { getServerSupabase } from './supabase';
+import { getServerSupabase } from './supabase.ts';
 
 const CITY_CODES: Record<string, string> = {
     varanasi: 'VNS',

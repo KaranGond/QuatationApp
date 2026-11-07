@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/authGuard";
+import { getUserSession, unauthorizedResponse } from "@/lib/authGuard";
 import { getServerSupabase } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
     try {
-        const authUser = await getAuthenticatedUser(request);
-        if (!authUser) {
-            return NextResponse.json({ success: false, message: "Authentication required" }, { status: 401 });
-        }
+        const session = await getUserSession(request);
+        if (!session) return unauthorizedResponse();
 
         const body = await request.json();
         const { phone, quotationData, vendor_id } = body;
+        const effectiveVendorId = (!session.isSuperAdmin && session.vendor_id)
+            ? session.vendor_id
+            : vendor_id;
 
         if (!phone) {
             return NextResponse.json({ success: false, message: "Phone required" }, { status: 400 });
@@ -25,13 +26,13 @@ export async function POST(request: NextRequest) {
         let vendorName = "Solar Shop";
         let vendorPhone = "";
 
-        if (vendor_id) {
+        if (effectiveVendorId) {
             try {
                 const supabase = getServerSupabase();
                 const { data: vendorData } = await supabase
                     .from('vendors')
                     .select('name, phone')
-                    .eq('id', vendor_id)
+                    .eq('id', effectiveVendorId)
                     .single();
                 if (vendorData) {
                     vendorName = vendorData.name || vendorName;

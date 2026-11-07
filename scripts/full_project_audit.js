@@ -3,8 +3,8 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = process.env.APP_BASE_URL || 'http://localhost:3000';
-const ARTIFACT_DIR = process.env.ARTIFACT_DIR || path.join(__dirname, '..', 'audit-output');
+const BASE_URL = 'http://localhost:3000';
+const ARTIFACT_DIR = '/Users/ratneshmishra/.gemini/antigravity-ide/brain/a359c681-8d5d-48c5-807a-bfb812701de0';
 
 const auditResults = {
   timestamp: new Date().toISOString(),

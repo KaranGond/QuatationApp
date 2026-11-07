@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
 import { gstConfig, calculateSavings, getSubsidyForCapacity } from '@/lib/companyDetails';
 import { getNextTenantQuoteNumber } from '@/lib/multiTenant';
-import { getAuthenticatedUser } from '@/lib/authGuard';
+import { getUserSession, unauthorizedResponse } from '@/lib/authGuard';
 
 // GET - List quotations with multi-tenant filtering
 export async function GET(request: Request) {
@@ -12,20 +12,12 @@ export async function GET(request: Request) {
         const limit = parseInt(searchParams.get('limit') || '50', 10);
         let vendorId = searchParams.get('vendor_id');
 
-        const authUser = await getAuthenticatedUser(request);
+        const session = await getUserSession(request);
         const supabase = getServerSupabase();
 
         // If authenticated as a vendor or salesperson, enforce their tenant_id
-        if (authUser) {
-            const { data: vUser } = await supabase
-                .from('vendor_users')
-                .select('vendor_id, role')
-                .eq('id', authUser.id)
-                .single();
-
-            if (vUser && vUser.role !== 'super_admin' && vUser.vendor_id) {
-                vendorId = vUser.vendor_id; // Restrict strictly to tenant
-            }
+        if (session && !session.isSuperAdmin && session.vendor_id) {
+            vendorId = session.vendor_id;
         }
 
         let query = supabase
@@ -55,10 +47,8 @@ export async function GET(request: Request) {
 // POST - Create new quotation with atomic tenant sequence number
 export async function POST(request: Request) {
     try {
-        const authUser = await getAuthenticatedUser(request);
-        if (!authUser) {
-            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
-        }
+        const session = await getUserSession(request);
+        if (!session) return unauthorizedResponse();
 
         const body = await request.json();
         const {
@@ -91,20 +81,11 @@ export async function POST(request: Request) {
 
         const supabase = getServerSupabase();
 
-        // Enforce tenant scoping for non-admin users
+        // Enforce vendor tenant isolation: non-super_admins can ONLY create quotes for their own tenant
         let targetVendorId = vendor_id || 'a0000000-0000-0000-0000-000000000001';
-        if (authUser) {
-            const { data: vUser } = await supabase
-                .from('vendor_users')
-                .select('vendor_id, role')
-                .eq('id', authUser.id)
-                .single();
-
-            if (vUser && vUser.role !== 'super_admin' && vUser.vendor_id) {
-                targetVendorId = vUser.vendor_id;
-            }
+        if (!session.isSuperAdmin && session.vendor_id) {
+            targetVendorId = session.vendor_id;
         }
-
         let vendorNodeId = 'NODE-VNS-001';
         let vendorSnapshot: any = null;
 
@@ -195,7 +176,6 @@ export async function POST(request: Request) {
                 components: components || null,
                 savings_data: savings,
                 salesperson: salesperson || null,
-                created_by: authUser.id,
                 status: status || 'draft',
                 pdf_url: pdf_url || null,
                 pdf_storage_path: pdf_storage_path || null,

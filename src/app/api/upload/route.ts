@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
-import { getAuthenticatedUser, unauthorizedResponse } from '@/lib/authGuard';
+import { getUserSession, unauthorizedResponse, forbiddenResponse } from '@/lib/authGuard';
 import { getTenantStoragePath } from '@/lib/multiTenant';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
 
 export async function POST(request: Request) {
-    const authUser = await getAuthenticatedUser(request);
-    if (!authUser) return unauthorizedResponse();
+    const session = await getUserSession(request);
+    if (!session) return unauthorizedResponse();
 
     try {
         const formData = await request.formData();
         const file = formData.get('file') as File | null;
         const type = ((formData.get('type') as string) || 'asset').toLowerCase(); // 'logo', 'signature', 'stamp', 'qr', 'barcode'
-        const vendorId = formData.get('vendor_id') as string | null;
+        const requestedVendorId = formData.get('vendor_id') as string | null;
         const autoUpdateDb = formData.get('auto_update_db') !== 'false';
 
         if (!file) {
@@ -24,17 +25,33 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, message: 'File too large. Maximum size is 5 MB.' }, { status: 400 });
         }
 
+        if (file.type && !ALLOWED_MIME_TYPES.includes(file.type.toLowerCase())) {
+            return NextResponse.json({ success: false, message: 'Invalid file format. Only PNG, JPEG, WEBP, and SVG images are allowed.' }, { status: 400 });
+        }
+
+        // Strict tenant isolation: non-super_admins can only upload to their own vendor vault
+        let effectiveVendorId = requestedVendorId;
+        if (!session.isSuperAdmin) {
+            if (!session.vendor_id) {
+                return forbiddenResponse('No vendor assigned to current user');
+            }
+            if (requestedVendorId && requestedVendorId !== session.vendor_id) {
+                return forbiddenResponse('Cannot upload assets to another vendor profile');
+            }
+            effectiveVendorId = session.vendor_id;
+        }
+
         const supabase = getServerSupabase();
 
         // Resolve vendor and node_id
         let targetVendor: any = null;
         let nodeId = 'general';
 
-        if (vendorId) {
+        if (effectiveVendorId) {
             const { data: v } = await supabase
                 .from('vendors')
                 .select('id, name, node_id')
-                .eq('id', vendorId)
+                .eq('id', effectiveVendorId)
                 .single();
             if (v) {
                 targetVendor = v;

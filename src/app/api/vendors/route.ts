@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
-import { getAuthenticatedUser, unauthorizedResponse } from '@/lib/authGuard';
+import { getUserSession, unauthorizedResponse, forbiddenResponse } from '@/lib/authGuard';
 import { generateNodeId, generateQuotePrefix } from '@/lib/multiTenant';
 
 // GET - List all vendors or get single vendor
@@ -54,8 +54,9 @@ export async function GET(request: Request) {
 
 // POST - Create a new vendor and optionally create their login credentials
 export async function POST(request: Request) {
-    const authUser = await getAuthenticatedUser(request);
-    if (!authUser) return unauthorizedResponse();
+    const session = await getUserSession(request);
+    if (!session) return unauthorizedResponse();
+    if (!session.isSuperAdmin) return forbiddenResponse('Only Super Administrators can create vendors');
 
     try {
         const body = await request.json();
@@ -191,8 +192,8 @@ export async function POST(request: Request) {
 
 // PUT - Update vendor details & credentials
 export async function PUT(request: Request) {
-    const authUser = await getAuthenticatedUser(request);
-    if (!authUser) return unauthorizedResponse();
+    const session = await getUserSession(request);
+    if (!session) return unauthorizedResponse();
 
     try {
         const body = await request.json();
@@ -200,6 +201,18 @@ export async function PUT(request: Request) {
 
         if (!id) {
             return NextResponse.json({ success: false, message: 'Vendor ID is required' }, { status: 400 });
+        }
+
+        // Strict RBAC: regular vendors can only update their own record and cannot alter system fields
+        if (!session.isSuperAdmin) {
+            if (session.vendor_id !== id) {
+                return forbiddenResponse('You can only update your own vendor profile');
+            }
+            delete updates.node_id;
+            delete updates.plan_tier;
+            delete updates.is_demo;
+            delete updates.quote_prefix;
+            delete updates.status;
         }
 
         const supabase = getServerSupabase();
@@ -301,8 +314,9 @@ export async function PUT(request: Request) {
 
 // DELETE - Deactivate/Delete vendor
 export async function DELETE(request: Request) {
-    const authUser = await getAuthenticatedUser(request);
-    if (!authUser) return unauthorizedResponse();
+    const session = await getUserSession(request);
+    if (!session) return unauthorizedResponse();
+    if (!session.isSuperAdmin) return forbiddenResponse('Only Super Administrators can deactivate vendors');
 
     try {
         const { searchParams } = new URL(request.url);

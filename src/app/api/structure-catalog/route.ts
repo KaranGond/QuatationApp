@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase";
 import { apolloProductsCatalog, ApolloProduct } from "@/data/apolloProducts";
-import { getAuthenticatedUser } from "@/lib/authGuard";
+import { getUserSession, unauthorizedResponse, forbiddenResponse } from "@/lib/authGuard";
 
 // Helper: convert DB row (snake_case) to ApolloProduct (camelCase)
 function rowToProduct(row: any): ApolloProduct {
@@ -43,13 +43,12 @@ export async function GET() {
   }
 }
 
-// POST - Add a new product or perform bulk operations
+// POST - Add a new product or perform bulk operations (super_admin only)
 export async function POST(request: Request) {
   try {
-    const authUser = await getAuthenticatedUser(request);
-    if (!authUser) {
-      return NextResponse.json({ success: false, message: "Authentication required" }, { status: 401 });
-    }
+    const session = await getUserSession(request);
+    if (!session) return unauthorizedResponse();
+    if (!session.isSuperAdmin) return forbiddenResponse('Only Super Administrators can modify the structure catalog');
 
     const body = await request.json();
     const supabase = getServerSupabase();
@@ -108,13 +107,12 @@ export async function POST(request: Request) {
   }
 }
 
-// PUT - Update an existing product (rate, stock, name, etc.)
+// PUT - Update an existing product (rate, stock, name, etc. - super_admin only)
 export async function PUT(request: Request) {
   try {
-    const authUser = await getAuthenticatedUser(request);
-    if (!authUser) {
-      return NextResponse.json({ success: false, message: "Authentication required" }, { status: 401 });
-    }
+    const session = await getUserSession(request);
+    if (!session) return unauthorizedResponse();
+    if (!session.isSuperAdmin) return forbiddenResponse("Only Super Administrators can modify the structure catalog");
 
     const body = await request.json();
     const { id, updates } = body;
@@ -154,13 +152,12 @@ export async function PUT(request: Request) {
   }
 }
 
-// DELETE - Remove a product from the catalog
+// DELETE - Remove a product from the catalog (super_admin only)
 export async function DELETE(request: Request) {
   try {
-    const authUser = await getAuthenticatedUser(request);
-    if (!authUser) {
-      return NextResponse.json({ success: false, message: "Authentication required" }, { status: 401 });
-    }
+    const session = await getUserSession(request);
+    if (!session) return unauthorizedResponse();
+    if (!session.isSuperAdmin) return forbiddenResponse("Only Super Administrators can delete structure catalog items");
 
     const { searchParams } = new URL(request.url);
     let id = searchParams.get("id");

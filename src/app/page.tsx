@@ -578,7 +578,7 @@ function QuotationBuilder() {
       unit: customB2BItem.unit,
       basePrice: Number(customB2BItem.basePrice) || 0,
       qty: Number(customB2BItem.qty) || 1,
-      gstRate: Number(customB2BItem.gstRate) !== undefined ? Number(customB2BItem.gstRate) : 18,
+      gstRate: typeof customB2BItem.gstRate === 'number' && !isNaN(customB2BItem.gstRate) ? customB2BItem.gstRate : 18,
       amount: +((Number(customB2BItem.basePrice) || 0) * (Number(customB2BItem.qty) || 1)).toFixed(2),
     };
     setB2bItems([...b2bItems, newItem]);
@@ -1425,7 +1425,7 @@ function QuotationBuilder() {
         <Box sx={{ flex: 1, overflow: "auto", p: 0 }}>
           {/* Company / Vendor Selection */}
           <Box sx={{ p: 2, borderBottom: "1px solid #e2e8f0", bgcolor: "#f8fafc" }}>
-            {mounted && role === 'vendor' ? (
+            {mounted && role !== 'super_admin' ? (
               <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: 'rgba(255, 152, 0, 0.08)', border: '1px solid rgba(255, 152, 0, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Storefront sx={{ color: '#ff9800', fontSize: 20 }} />

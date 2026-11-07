@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# database backups & credentials dumps
+supabase_backup_*/
+*.sql.bak
+
 # vercel
 .vercel
 

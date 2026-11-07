@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getServerSupabase } from './supabase';
+
+export interface UserSession {
+    user: any;
+    id: string;
+    email: string;
+    role: 'super_admin' | 'vendor' | 'salesperson';
+    vendor_id: string | null;
+    isSuperAdmin: boolean;
+}
 
 /**
  * Validates the caller's Supabase JWT from the Authorization header
  * or from the sb-access-token cookie. Returns the authenticated user
  * or null if unauthenticated.
- *
- * For server API routes that use the service_role key for DB ops but
- * still need to verify that the caller is a real logged-in user.
  */
 export async function getAuthenticatedUser(request: Request) {
     try {
@@ -18,7 +25,7 @@ export async function getAuthenticatedUser(request: Request) {
         // verify the user's JWT without elevating privileges.
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-        // Try Authorization header first
+        // 1. Try Authorization header first
         const authHeader = request.headers.get('authorization');
         if (authHeader?.startsWith('Bearer ')) {
             const token = authHeader.slice(7);
@@ -26,7 +33,7 @@ export async function getAuthenticatedUser(request: Request) {
             if (!error && user) return user;
         }
 
-        // Try cookie-based session (browser requests from Next.js client)
+        // 2. Try cookie-based session (browser requests from Next.js client)
         const cookieHeader = request.headers.get('cookie') || '';
         const cookies = Object.fromEntries(
             cookieHeader.split(';').map(c => {
@@ -35,24 +42,22 @@ export async function getAuthenticatedUser(request: Request) {
             })
         );
 
-        // Supabase stores the access token in cookies with various naming patterns
         const accessToken =
             cookies['sb-access-token'] ||
             cookies[`sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`] ||
             '';
 
         if (accessToken) {
-            // Parse the token from the cookie (Supabase stores JSON in the cookie)
             let token = accessToken;
             try {
                 const parsed = JSON.parse(decodeURIComponent(accessToken));
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    token = parsed[0]; // [access_token, refresh_token]
+                    token = parsed[0];
                 } else if (parsed.access_token) {
                     token = parsed.access_token;
                 }
             } catch {
-                // Token is already a raw JWT string
+                // Raw token string
             }
 
             const { data: { user }, error } = await supabase.auth.getUser(token);
@@ -66,11 +71,61 @@ export async function getAuthenticatedUser(request: Request) {
 }
 
 /**
+ * Retrieves full verified user session including validated role and tenant vendor_id.
+ */
+export async function getUserSession(request: Request): Promise<UserSession | null> {
+    const user = await getAuthenticatedUser(request);
+    if (!user) return null;
+
+    let role: 'super_admin' | 'vendor' | 'salesperson' = 'vendor';
+    let vendor_id: string | null = null;
+
+    try {
+        const supabase = getServerSupabase();
+        const { data: vUser } = await supabase
+            .from('vendor_users')
+            .select('role, vendor_id')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (vUser) {
+            role = (vUser.role as any) || 'vendor';
+            vendor_id = vUser.vendor_id || null;
+        } else {
+            role = (user.user_metadata?.role as any) || 'vendor';
+            vendor_id = user.user_metadata?.vendor_id || null;
+        }
+    } catch {
+        role = (user.user_metadata?.role as any) || 'vendor';
+        vendor_id = user.user_metadata?.vendor_id || null;
+    }
+
+    return {
+        user,
+        id: user.id,
+        email: user.email || '',
+        role,
+        vendor_id,
+        isSuperAdmin: role === 'super_admin',
+    };
+}
+
+/**
  * Returns a 401 JSON response for unauthenticated requests.
  */
 export function unauthorizedResponse(message = 'Authentication required') {
     return NextResponse.json(
         { success: false, message },
         { status: 401 }
+    );
+}
+
+/**
+ * Returns a 403 JSON response for unauthorized requests.
+ */
+export function forbiddenResponse(message = 'Access denied: insufficient permissions') {
+    return NextResponse.json(
+        { success: false, message },
+        { status: 403 }
     );
 }

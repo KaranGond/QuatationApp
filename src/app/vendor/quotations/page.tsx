@@ -3,17 +3,8 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Box, CircularProgress, Typography } from '@mui/material';
-import AuthGuard from '@/components/AuthGuard';
 
-export default function VendorQuotationsPage() {
-    return (
-        <AuthGuard>
-            <VendorQuotationsRedirect />
-        </AuthGuard>
-    );
-}
-
-function VendorQuotationsRedirect() {
+export default function VendorQuotationsRedirect() {
     const router = useRouter();
 
     useEffect(() => {

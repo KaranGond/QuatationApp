@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
-import { getAuthenticatedUser } from '@/lib/authGuard';
+import { getUserSession, unauthorizedResponse, forbiddenResponse } from '@/lib/authGuard';
 
-// POST - Batch save components for a system type
+// POST - Batch save components for a system type (super_admin only)
 // Deletes existing components for the system type and inserts new ones
 export async function POST(request: Request) {
     try {
-        const authUser = await getAuthenticatedUser(request);
-        if (!authUser) {
-            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
-        }
+        const session = await getUserSession(request);
+        if (!session) return unauthorizedResponse();
+        if (!session.isSuperAdmin) return forbiddenResponse('Only Super Administrators can batch save system components');
 
         const body = await request.json();
         const { system_type, system_type_id, components } = body;

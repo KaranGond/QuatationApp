@@ -3,17 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Box, CircularProgress, Typography } from "@mui/material";
-import AuthGuard from "@/components/AuthGuard";
 
-export default function ServicePage() {
-  return (
-    <AuthGuard>
-      <ServiceRedirectContent />
-    </AuthGuard>
-  );
-}
-
-function ServiceRedirectContent() {
+export default function ServiceRedirectPage() {
   const router = useRouter();
 
   useEffect(() => {

@@ -1,6 +1,16 @@
 // src/lib/quoteTemplate.ts - Professional quotation PDF template matching live preview
 
-import { companyDetails as defaultCompanyDetails } from './companyDetails';
+import { companyDetails as defaultCompanyDetails } from './companyDetails.ts';
+
+function escapeHtml(str: any): string {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 export const generateQuoteHtml = (data: any): string => {
   const { customerInfo, selectedProduct, calculations, components = [], terms = [], logoUrl, qrCodeUrl, upiLink } = data;
@@ -19,16 +29,37 @@ export const generateQuoteHtml = (data: any): string => {
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('en-IN').format(Math.round(val));
   const currentDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  const quoteNumber = data.quoteNumber || data.quote_number || `${company.quote_prefix || company.quotePrefix || 'KSS'}-${(customerInfo?.name || 'X').charAt(0).toUpperCase()}${Date.now().toString().slice(-6)}`;
+  const rawQuoteNumber = data.quoteNumber || data.quote_number || `${company.quote_prefix || company.quotePrefix || 'KSS'}-${(customerInfo?.name || 'X').charAt(0).toUpperCase()}${Date.now().toString().slice(-6)}`;
+  const quoteNumber = escapeHtml(rawQuoteNumber);
 
   // System info
   const systemSize = selectedProduct?.capacity || 0;
   const phase = selectedProduct?.phase === 1 ? 'Single Phase' : 'Three Phase';
-  const panelBrand = selectedProduct?.panelBrand || '';
-  const panelWattage = selectedProduct?.panelWattage || '';
-  const panelType = selectedProduct?.panelType || '';
-  const inverterBrand = selectedProduct?.inverterBrand || '';
-  const systemType = selectedProduct?.systemType || 'On-grid';
+  const panelBrand = escapeHtml(selectedProduct?.panelBrand || '');
+  const panelWattage = escapeHtml(selectedProduct?.panelWattage || '');
+  const panelType = escapeHtml(selectedProduct?.panelType || '');
+  const inverterBrand = escapeHtml(selectedProduct?.inverterBrand || '');
+  const systemType = escapeHtml(selectedProduct?.systemType || 'On-grid');
+  const panelWarranty = escapeHtml(data.panelWarranty || '25 Years');
+  const inverterWarranty = escapeHtml(data.inverterWarranty || '5 Years');
+  const batteryWarranty = escapeHtml(data.batteryWarranty || '5 Years');
+
+  const customerName = escapeHtml(customerInfo?.name || '________________');
+  const customerAddress = escapeHtml(customerInfo?.address || '');
+  const customerPhone = escapeHtml(customerInfo?.phone || '');
+
+  const companyName = escapeHtml(company.name || '');
+  const companyTagline = escapeHtml(company.tagline || '');
+  const companyGstin = escapeHtml(company.gstin || '');
+  const companyHeadOffice = escapeHtml(company.headOffice || '');
+  const companyPhone = escapeHtml(company.phone || '');
+  const companyEmail = escapeHtml(company.email || '');
+
+  const bankAccountName = escapeHtml(company.bank?.accountName || '');
+  const bankAccountNumber = escapeHtml(company.bank?.accountNumber || '');
+  const bankIfsc = escapeHtml(company.bank?.ifsc || '');
+  const bankName = escapeHtml(company.bank?.name || '');
+  const bankBranch = escapeHtml(company.bank?.branch || '');
 
   return `<!DOCTYPE html>
 <html>
@@ -130,12 +161,12 @@ export const generateQuoteHtml = (data: any): string => {
       <div class="logo-section">
         ${logoUrl ? `<img src="${logoUrl}" class="logo" alt="Logo" />` : ''}
         <div>
-          <div class="company-name">${company.name.toUpperCase()}</div>
-          <div class="company-tagline">${company.tagline}</div>
+          <div class="company-name">${companyName.toUpperCase()}</div>
+          <div class="company-tagline">${companyTagline}</div>
           <div class="company-info">
-            <div class="gstin">GSTIN: ${company.gstin}</div>
-            <div><strong>HO:</strong> ${company.headOffice}</div>
-            <div><strong>Contact:</strong> ${company.phone} | <strong>Email:</strong> ${company.email}</div>
+            <div class="gstin">GSTIN: ${companyGstin}</div>
+            <div><strong>HO:</strong> ${companyHeadOffice}</div>
+            <div><strong>Contact:</strong> ${companyPhone} | <strong>Email:</strong> ${companyEmail}</div>
           </div>
         </div>
       </div>
@@ -152,18 +183,18 @@ export const generateQuoteHtml = (data: any): string => {
     <div class="grid-2">
       <div class="info-box">
         <div class="info-title">Customer Details</div>
-        <div class="customer-name">${customerInfo?.name || '________________'}</div>
-        ${customerInfo?.address ? `<div class="customer-detail" style="font-style: italic;">${customerInfo.address}</div>` : ''}
-        ${customerInfo?.phone ? `<div class="customer-detail">Mo No: ${customerInfo.phone}</div>` : ''}
+        <div class="customer-name">${customerName}</div>
+        ${customerAddress ? `<div class="customer-detail" style="font-style: italic;">${customerAddress}</div>` : ''}
+        ${customerPhone ? `<div class="customer-detail">Mo No: ${customerPhone}</div>` : ''}
       </div>
       <div class="info-box">
         <div class="info-title">System Overview</div>
         <div class="system-row"><span>System Size:</span> <strong>${systemSize} KW (${phase})</strong></div>
         <div class="system-row"><span>Modules:</span> <strong>${panelBrand} ${panelWattage}Wp (${panelType})</strong></div>
-        <div class="system-row" style="color: #475569;"><span>Module Warranty:</span> <strong>${data.panelWarranty}</strong></div>
+        <div class="system-row" style="color: #475569;"><span>Module Warranty:</span> <strong>${panelWarranty}</strong></div>
         <div class="system-row"><span>Inverter:</span> <strong>${inverterBrand}</strong></div>
-        <div class="system-row" style="color: #475569;"><span>Inverter Warranty:</span> <strong>${data.inverterWarranty}</strong></div>
-        ${(systemType === 'Hybrid' || systemType === 'Off-grid') ? `<div class="system-row" style="color: #475569;"><span>Battery Warranty:</span> <strong>${data.batteryWarranty}</strong></div>` : ''}
+        <div class="system-row" style="color: #475569;"><span>Inverter Warranty:</span> <strong>${inverterWarranty}</strong></div>
+        ${(systemType === 'Hybrid' || systemType === 'Off-grid') ? `<div class="system-row" style="color: #475569;"><span>Battery Warranty:</span> <strong>${batteryWarranty}</strong></div>` : ''}
         <div class="system-row"><span>Type:</span> <strong>${systemType}</strong></div>
       </div>
     </div>
@@ -184,10 +215,10 @@ export const generateQuoteHtml = (data: any): string => {
           ${components.map((comp: any, i: number) => `
             <tr class="${i < 2 ? 'highlight-row' : ''}">
               <td class="td-center">${i + 1}</td>
-              <td style="font-weight: 700;">${comp.name || ''}</td>
-              <td>${comp.description || ''}</td>
-              <td class="td-center">${comp.quantity || ''}</td>
-              <td class="td-center" style="font-weight: 700; color: #1e40af;">${comp.make || ''}</td>
+              <td style="font-weight: 700;">${escapeHtml(comp.name || '')}</td>
+              <td>${escapeHtml(comp.description || '')}</td>
+              <td class="td-center">${escapeHtml(comp.quantity || '')}</td>
+              <td class="td-center" style="font-weight: 700; color: #1e40af;">${escapeHtml(comp.make || '')}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -209,9 +240,9 @@ export const generateQuoteHtml = (data: any): string => {
         
         <div class="bank-box" style="margin-top: 15px;">
           <div class="info-title">Bank Details</div>
-          <p style="margin: 4px 0;"><strong>A/c Name:</strong> ${company.bank.accountName}</p>
-          <p style="margin: 4px 0;"><strong>A/c No:</strong> ${company.bank.accountNumber} | <strong>IFSC:</strong> ${company.bank.ifsc}</p>
-          <p style="margin: 4px 0;"><strong>Bank:</strong> ${company.bank.name}, ${company.bank.branch}</p>
+          <p style="margin: 4px 0;"><strong>A/c Name:</strong> ${bankAccountName}</p>
+          <p style="margin: 4px 0;"><strong>A/c No:</strong> ${bankAccountNumber} | <strong>IFSC:</strong> ${bankIfsc}</p>
+          <p style="margin: 4px 0;"><strong>Bank:</strong> ${bankName}, ${bankBranch}</p>
           
           ${qrCodeUrl ? `
           <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #cbd5e1; text-align: center;">
@@ -302,7 +333,7 @@ export const generateQuoteHtml = (data: any): string => {
       'Installation completed within 7-10 working days.',
       'Module Warranty: 25 Years. Inverter: 5 Years.',
       'Free Annual Maintenance for 1st year.'
-    ]).map((term: string) => `<div class="term-item">${term.replace(/^([^:]+):/, '<strong>$1:</strong>')}</div>`).join('')}
+    ]).map((term: string) => `<div class="term-item">${escapeHtml(term).replace(/^([^:]+):/, '<strong>$1:</strong>')}</div>`).join('')}
       </div>
     </div>
     
@@ -313,7 +344,7 @@ export const generateQuoteHtml = (data: any): string => {
         <div class="sig-label">Customer Signature</div>
       </div>
       <div class="sig-box right">
-        <div class="for-company">For ${company.name}</div>
+        <div class="for-company">For ${companyName}</div>
         ${data.signatureUrl ? `<img src="${data.signatureUrl}" style="height: 60px; object-fit: contain; margin-bottom: -10px; display: block; margin-left: auto;" alt="Signature" />` : '<div style="height: 50px;"></div>'}
         <div class="sig-line"></div>
         <div class="sig-label">Authorized Signatory</div>

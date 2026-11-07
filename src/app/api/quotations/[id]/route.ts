@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
 import { gstConfig, calculateSavings } from '@/lib/companyDetails';
-import { getAuthenticatedUser } from '@/lib/authGuard';
+import { getUserSession, unauthorizedResponse, forbiddenResponse } from '@/lib/authGuard';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 // GET - Get single quotation
 export async function GET(request: Request, context: RouteContext) {
     try {
-        const authUser = await getAuthenticatedUser(request);
-        if (!authUser) {
-            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
-        }
+        const session = await getUserSession(request);
+        if (!session) return unauthorizedResponse();
 
         const { id } = await context.params;
         const supabase = getServerSupabase();
@@ -27,16 +25,11 @@ export async function GET(request: Request, context: RouteContext) {
             return NextResponse.json({ success: false, message: 'Quotation not found' }, { status: 404 });
         }
 
-        // Enforce tenant authorization for non-admin users
-        const { data: vUser } = await supabase
-            .from('vendor_users')
-            .select('vendor_id, role')
-            .eq('id', authUser.id)
-            .single();
-
-        if (vUser && vUser.role !== 'super_admin' && vUser.vendor_id) {
-            if (data.vendor_id !== vUser.vendor_id && data.tenant_id !== vUser.vendor_id) {
-                return NextResponse.json({ success: false, message: 'Access denied: quotation belongs to another tenant' }, { status: 403 });
+        // Strict multi-tenant isolation
+        if (!session.isSuperAdmin && session.vendor_id) {
+            const quoteVendorId = data.vendor_id || data.tenant_id;
+            if (quoteVendorId && quoteVendorId !== session.vendor_id) {
+                return forbiddenResponse('You do not have permission to view this quotation');
             }
         }
 
@@ -49,30 +42,27 @@ export async function GET(request: Request, context: RouteContext) {
 // PUT - Update quotation
 export async function PUT(request: Request, context: RouteContext) {
     try {
-        const authUser = await getAuthenticatedUser(request);
-        if (!authUser) {
-            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
-        }
+        const session = await getUserSession(request);
+        if (!session) return unauthorizedResponse();
 
         const { id } = await context.params;
         const supabase = getServerSupabase();
 
-        // Enforce tenant authorization for non-admin users
-        const { data: vUser } = await supabase
-            .from('vendor_users')
-            .select('vendor_id, role')
-            .eq('id', authUser.id)
+        // 1. Verify existence and tenant ownership
+        const { data: existingQuote, error: fetchErr } = await supabase
+            .from('quotations')
+            .select('vendor_id, tenant_id')
+            .eq('id', id)
             .single();
 
-        if (vUser && vUser.role !== 'super_admin' && vUser.vendor_id) {
-            const { data: existingQuote } = await supabase
-                .from('quotations')
-                .select('vendor_id, tenant_id')
-                .eq('id', id)
-                .single();
+        if (fetchErr || !existingQuote) {
+            return NextResponse.json({ success: false, message: 'Quotation not found' }, { status: 404 });
+        }
 
-            if (existingQuote && existingQuote.vendor_id !== vUser.vendor_id && existingQuote.tenant_id !== vUser.vendor_id) {
-                return NextResponse.json({ success: false, message: 'Access denied: cannot modify another tenant quotation' }, { status: 403 });
+        if (!session.isSuperAdmin && session.vendor_id) {
+            const quoteVendorId = existingQuote.vendor_id || existingQuote.tenant_id;
+            if (quoteVendorId && quoteVendorId !== session.vendor_id) {
+                return forbiddenResponse('You do not have permission to modify this quotation');
             }
         }
 
@@ -95,12 +85,12 @@ export async function PUT(request: Request, context: RouteContext) {
             salesperson,
             status,
             pdf_url,
-            form_data, // NEW: full form state for round-trip editing
+            form_data,
         } = body;
 
-        // Recalculate GST and totals
+        // Recalculate GST and totals for financial integrity
         const effectiveGstRate = gst_rate || gstConfig.compositeRate;
-        const baseAmount = base_price || 0;
+        const baseAmount = Number(base_price) || 0;
         const gst_amount = +(baseAmount * (effectiveGstRate / 100)).toFixed(2);
         const total_amount = +(baseAmount + gst_amount).toFixed(2);
 
@@ -112,8 +102,8 @@ export async function PUT(request: Request, context: RouteContext) {
             state_subsidy
         );
 
-        // Build update object — only include fields that are provided
-        const updateData: any = {
+        // Build update object
+        const updateData: Record<string, any> = {
             customer_name,
             customer_phone,
             customer_address,
@@ -133,17 +123,11 @@ export async function PUT(request: Request, context: RouteContext) {
             savings_data: savings,
             salesperson,
             status,
+            updated_at: new Date().toISOString(),
         };
 
-        // Only update pdf_url if provided
-        if (pdf_url !== undefined) {
-            updateData.pdf_url = pdf_url;
-        }
-
-        // Store form_data if provided
-        if (form_data !== undefined) {
-            updateData.form_data = form_data;
-        }
+        if (pdf_url !== undefined) updateData.pdf_url = pdf_url;
+        if (form_data !== undefined) updateData.form_data = form_data;
 
         const { data, error } = await supabase
             .from('quotations')
@@ -163,30 +147,27 @@ export async function PUT(request: Request, context: RouteContext) {
 // DELETE - Delete quotation
 export async function DELETE(request: Request, context: RouteContext) {
     try {
-        const authUser = await getAuthenticatedUser(request);
-        if (!authUser) {
-            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
-        }
+        const session = await getUserSession(request);
+        if (!session) return unauthorizedResponse();
 
         const { id } = await context.params;
         const supabase = getServerSupabase();
 
-        // Enforce tenant authorization for non-admin users
-        const { data: vUser } = await supabase
-            .from('vendor_users')
-            .select('vendor_id, role')
-            .eq('id', authUser.id)
+        // 1. Verify existence and tenant ownership
+        const { data: existingQuote, error: fetchErr } = await supabase
+            .from('quotations')
+            .select('vendor_id, tenant_id')
+            .eq('id', id)
             .single();
 
-        if (vUser && vUser.role !== 'super_admin' && vUser.vendor_id) {
-            const { data: existingQuote } = await supabase
-                .from('quotations')
-                .select('vendor_id, tenant_id')
-                .eq('id', id)
-                .single();
+        if (fetchErr || !existingQuote) {
+            return NextResponse.json({ success: false, message: 'Quotation not found' }, { status: 404 });
+        }
 
-            if (existingQuote && existingQuote.vendor_id !== vUser.vendor_id && existingQuote.tenant_id !== vUser.vendor_id) {
-                return NextResponse.json({ success: false, message: 'Access denied: cannot delete another tenant quotation' }, { status: 403 });
+        if (!session.isSuperAdmin && session.vendor_id) {
+            const quoteVendorId = existingQuote.vendor_id || existingQuote.tenant_id;
+            if (quoteVendorId && quoteVendorId !== session.vendor_id) {
+                return forbiddenResponse('You do not have permission to delete this quotation');
             }
         }
 
@@ -197,7 +178,7 @@ export async function DELETE(request: Request, context: RouteContext) {
 
         if (error) throw error;
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, message: 'Quotation deleted successfully' });
     } catch (error) {
         return NextResponse.json({ success: false, message: (error as any).message }, { status: 500 });
     }

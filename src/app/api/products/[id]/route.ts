@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
-import { getAuthenticatedUser } from '@/lib/authGuard';
+import { getUserSession, unauthorizedResponse, forbiddenResponse } from '@/lib/authGuard';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -24,13 +24,12 @@ export async function GET(request: Request, context: RouteContext) {
     }
 }
 
-// PUT - Update product
+// PUT - Update product (super_admin only)
 export async function PUT(request: Request, context: RouteContext) {
     try {
-        const authUser = await getAuthenticatedUser(request);
-        if (!authUser) {
-            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
-        }
+        const session = await getUserSession(request);
+        if (!session) return unauthorizedResponse();
+        if (!session.isSuperAdmin) return forbiddenResponse('Only Super Administrators can update products');
 
         const { id } = await context.params;
         const body = await request.json();
@@ -61,13 +60,12 @@ export async function PUT(request: Request, context: RouteContext) {
     }
 }
 
-// DELETE - Delete product
+// DELETE - Delete product (super_admin only)
 export async function DELETE(request: Request, context: RouteContext) {
     try {
-        const authUser = await getAuthenticatedUser(request);
-        if (!authUser) {
-            return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
-        }
+        const session = await getUserSession(request);
+        if (!session) return unauthorizedResponse();
+        if (!session.isSuperAdmin) return forbiddenResponse('Only Super Administrators can delete products');
 
         const { id } = await context.params;
         const supabase = getServerSupabase();

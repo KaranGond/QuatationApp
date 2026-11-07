@@ -7,7 +7,7 @@ import { sendWhatsAppMessage } from '../../../lib/whatsapp';
 import { generateQuoteHtml } from '../../../lib/quoteTemplate';
 import { defaultComponents } from '@/lib/companyDetails';
 import { GST_RATE } from '../../../data/priceList';
-import { getAuthenticatedUser } from '@/lib/authGuard';
+import { getUserSession, unauthorizedResponse } from '@/lib/authGuard';
 
 export const runtime = 'nodejs';
 
@@ -15,10 +15,8 @@ export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
-    const authUser = await getAuthenticatedUser(request);
-    if (!authUser) {
-      return NextResponse.json({ message: 'Authentication required' }, { status: 401 });
-    }
+    const session = await getUserSession(request);
+    if (!session) return unauthorizedResponse();
 
     const quoteData = await request.json();
 
@@ -156,7 +154,10 @@ export async function POST(request: Request) {
       try { await browser.close(); } catch { }
     }
 
-    const vendorId = quoteData.vendor_id || quoteData.companyDetails?.id || 'a0000000-0000-0000-0000-000000000001';
+    const requestedVendorId = quoteData.vendor_id || quoteData.companyDetails?.id;
+    const vendorId = (!session.isSuperAdmin && session.vendor_id)
+      ? session.vendor_id
+      : (requestedVendorId || 'a0000000-0000-0000-0000-000000000001');
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_KEY!);
     
     // Resolve tenant Node ID for sandboxed storage
