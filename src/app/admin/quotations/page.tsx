@@ -28,6 +28,7 @@ import { ArrowBack, Visibility, Delete, Search, WhatsApp, Edit, Construction, Ad
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { apiFetch } from "@/lib/apiFetch";
 
 type Quotation = {
     id: string;
@@ -66,8 +67,8 @@ export default function QuotationsAdminPage() {
     const fetchQuotations = async () => {
         try {
             const [quoteRes, vendorRes] = await Promise.all([
-                fetch("/api/quotations?limit=1000"),
-                fetch("/api/vendors"),
+                apiFetch("/api/quotations?limit=1000"),
+                apiFetch("/api/vendors"),
             ]);
             const quoteData = await quoteRes.json();
             const vendorData = await vendorRes.json();
@@ -93,7 +94,7 @@ export default function QuotationsAdminPage() {
         if (!confirm("Are you sure you want to delete this quotation?")) return;
 
         try {
-            const res = await fetch(`/api/quotations/${id}`, { method: "DELETE" });
+            const res = await apiFetch(`/api/quotations/${id}`, { method: "DELETE" });
             const data = await res.json();
             if (data.success) {
                 fetchQuotations();

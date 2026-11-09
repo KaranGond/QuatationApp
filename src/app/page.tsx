@@ -56,6 +56,7 @@ import {
 } from "@mui/icons-material";
 import { useAuth } from "@/context/AuthContext";
 import AuthGuard from "@/components/AuthGuard";
+import { apiFetch } from "@/lib/apiFetch";
 import { useReactToPrint } from "react-to-print";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -307,7 +308,7 @@ function QuotationBuilder() {
     const loadQuotation = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/quotations/${editId}`);
+        const res = await apiFetch(`/api/quotations/${editId}`);
         const result = await res.json();
         if (!result.success || !result.data) {
           setNotification({ open: true, message: "Failed to load quotation for editing", severity: "error" });
@@ -468,7 +469,7 @@ function QuotationBuilder() {
   const [b2bCatalog, setB2bCatalog] = useState<ApolloProduct[]>(apolloProductsCatalog);
 
   const fetchB2BCatalog = useCallback(() => {
-    fetch("/api/structure-catalog")
+    apiFetch("/api/structure-catalog")
       .then((res) => res.json())
       .then((json) => {
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
@@ -608,7 +609,7 @@ function QuotationBuilder() {
     // Skip fetching if in edit mode and data hasn't been loaded yet
     if (editingQuotationId && !editLoaded) return;
     try {
-      const res = await fetch(`/api/components?system_type=${encodeURIComponent(systemType)}`);
+      const res = await apiFetch(`/api/components?system_type=${encodeURIComponent(systemType)}`);
       const data = await res.json();
       if (data.success && data.data && data.data.length > 0 && !data.fromDefaults) {
         // Got components from DB — use them as base, apply current panel/inverter info
@@ -889,7 +890,7 @@ function QuotationBuilder() {
         }))
         : components;
 
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1045,7 +1046,7 @@ function QuotationBuilder() {
     if (!customerName) { setNotification({ open: true, message: "Customer name is required", severity: "error" }); return null; }
     try {
       const quoteData = buildQuoteData({ skipWhatsApp: true });
-      const response = await fetch("/api/quote", {
+      const response = await apiFetch("/api/quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(quoteData)
@@ -1120,7 +1121,7 @@ function QuotationBuilder() {
     try {
       const quoteData = buildQuoteData({ skipWhatsApp: false });
 
-      const response = await fetch("/api/quote", {
+      const response = await apiFetch("/api/quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(quoteData)
@@ -1157,7 +1158,7 @@ function QuotationBuilder() {
         await generateAndSavePdf('Emailed');
       } catch { /* PDF save failure shouldn't block email */ }
 
-      const response = await fetch("/api/send-email", {
+      const response = await apiFetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: emailToUse, quotationData: getQuotationData() })

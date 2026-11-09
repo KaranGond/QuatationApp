@@ -195,6 +195,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return { success: false, error: error.message };
             }
 
+            if (data.session?.access_token) {
+                syncAuthCookie(data.session.access_token);
+            }
+
             let resolvedRole = null;
             if (data.user) {
                 resolvedRole = await loadUserData(data.user);

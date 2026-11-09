@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/apiFetch";
 import {
     Box,
     Typography,
@@ -78,7 +79,7 @@ export default function ProductsAdminPage() {
     // Fetch products
     const fetchProducts = async () => {
         try {
-            const res = await fetch("/api/products?active=all");
+            const res = await apiFetch("/api/products?active=all");
             const data = await res.json();
             if (data.success) {
                 setProducts(data.data || []);
@@ -128,7 +129,7 @@ export default function ProductsAdminPage() {
             const url = editingProduct ? `/api/products/${editingProduct.id}` : "/api/products";
             const method = editingProduct ? "PUT" : "POST";
 
-            const res = await fetch(url, {
+            const res = await apiFetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(formData),
@@ -152,7 +153,7 @@ export default function ProductsAdminPage() {
         if (!confirm("Are you sure you want to delete this product?")) return;
 
         try {
-            const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+            const res = await apiFetch(`/api/products/${id}`, { method: "DELETE" });
             const data = await res.json();
             if (data.success) {
                 setNotification({ open: true, message: "Product deleted successfully!", severity: "success" });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { apiFetch } from "@/lib/apiFetch";
 import {
   Box,
   Typography,
@@ -84,7 +85,7 @@ export default function AdminStructureCatalogPage() {
   const fetchCatalog = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/structure-catalog");
+      const res = await apiFetch("/api/structure-catalog");
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
         setCatalog(data.data);
@@ -172,7 +173,7 @@ export default function AdminStructureCatalogPage() {
     try {
       if (editingProduct) {
         // PUT update
-        const res = await fetch("/api/structure-catalog", {
+        const res = await apiFetch("/api/structure-catalog", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -199,7 +200,7 @@ export default function AdminStructureCatalogPage() {
         }
       } else {
         // POST new
-        const res = await fetch("/api/structure-catalog", {
+        const res = await apiFetch("/api/structure-catalog", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -236,7 +237,7 @@ export default function AdminStructureCatalogPage() {
     }
 
     try {
-      const res = await fetch("/api/structure-catalog", {
+      const res = await apiFetch("/api/structure-catalog", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -266,7 +267,7 @@ export default function AdminStructureCatalogPage() {
     }
 
     try {
-      const res = await fetch("/api/structure-catalog", {
+      const res = await apiFetch("/api/structure-catalog", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -294,7 +295,7 @@ export default function AdminStructureCatalogPage() {
     }
 
     try {
-      const res = await fetch(`/api/structure-catalog?id=${product.id}`, {
+      const res = await apiFetch(`/api/structure-catalog?id=${product.id}`, {
         method: "DELETE",
       });
       const json = await res.json();
@@ -320,7 +321,7 @@ export default function AdminStructureCatalogPage() {
     }
 
     try {
-      const res = await fetch("/api/structure-catalog", {
+      const res = await apiFetch("/api/structure-catalog", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reset" }),

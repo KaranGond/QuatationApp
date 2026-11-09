@@ -23,6 +23,7 @@ import EditNoteIcon from '@mui/icons-material/EditNote';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
+import { apiFetch } from '@/lib/apiFetch';
 
 export default function VendorDashboardPage() {
     return (
@@ -49,7 +50,7 @@ function VendorDashboardContent() {
             if (!vendor?.id) return;
             setLoading(true);
             try {
-                const res = await fetch(`/api/quotations?vendor_id=${vendor.id}&limit=10`);
+                const res = await apiFetch(`/api/quotations?vendor_id=${vendor.id}&limit=10`);
                 const json = await res.json();
                 if (json.success) {
                     const quotes = json.data || [];

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { apiFetch } from "@/lib/apiFetch";
 import {
     Box,
     Typography,
@@ -91,7 +92,7 @@ export default function ComponentsAdminPage() {
         setLoading(true);
         setHasUnsavedChanges(false);
         try {
-            const res = await fetch(`/api/components?system_type=${encodeURIComponent(systemType)}`);
+            const res = await apiFetch(`/api/components?system_type=${encodeURIComponent(systemType)}`);
             const data = await res.json();
             if (data.success && data.data && data.data.length > 0 && !data.fromDefaults) {
                 // We got components from DB
@@ -203,7 +204,7 @@ export default function ComponentsAdminPage() {
         setSaving(true);
         try {
             // First, resolve the system_type_id for the selected system type
-            const typeRes = await fetch(`/api/system-types`);
+            const typeRes = await apiFetch(`/api/system-types`);
             const typeData = await typeRes.json();
             let systemTypeId: string | null = null;
             if (typeData.success && typeData.data) {
@@ -213,7 +214,7 @@ export default function ComponentsAdminPage() {
 
             // Delete existing components for this system type, then insert new ones
             // We'll use a batch approach via a custom endpoint
-            const res = await fetch(`/api/components/batch`, {
+            const res = await apiFetch(`/api/components/batch`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

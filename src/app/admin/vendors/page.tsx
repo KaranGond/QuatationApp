@@ -55,6 +55,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import LockIcon from '@mui/icons-material/Lock';
 import CheckIcon from '@mui/icons-material/Check';
 import { useAuth } from '@/context/AuthContext';
+import { apiFetch } from '@/lib/apiFetch';
 
 export default function AdminVendorsPage() {
     const router = useRouter();
@@ -148,7 +149,7 @@ export default function AdminVendorsPage() {
     const loadVendors = async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/vendors');
+            const res = await apiFetch('/api/vendors');
             const json = await res.json();
             if (json.success) {
                 const list = json.data || [];
@@ -223,13 +224,18 @@ export default function AdminVendorsPage() {
             formData.append('type', type);
             formData.append('vendor_id', remoteVendorId);
 
-            const res = await fetch('/api/upload', {
+            const res = await apiFetch('/api/upload', {
                 method: 'POST',
                 body: formData,
             });
 
-            const json = await res.json();
-            if (!json.success) throw new Error(json.message);
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json.success) {
+                if (res.status === 401) {
+                    throw new Error('Your administrator session has expired. Please refresh the page or sign in again as Super Admin.');
+                }
+                throw new Error(json.message || `Operation failed (${res.status})`);
+            }
 
             if (type === 'logo') setRcLogoUrl(json.url);
             if (type === 'signature') setRcSignatureUrl(json.url);
@@ -288,20 +294,25 @@ export default function AdminVendorsPage() {
                 payload.login_email = rcEmail.trim();
             }
 
-            const res = await fetch('/api/vendors', {
+            const res = await apiFetch('/api/vendors', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
 
-            const json = await res.json();
-            if (!json.success) throw new Error(json.message);
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json.success) {
+                if (res.status === 401) {
+                    throw new Error('Your administrator session has expired. Please refresh the page or sign in again as Super Admin.');
+                }
+                throw new Error(json.message || `Operation failed (${res.status})`);
+            }
 
             setRemoteSuccess(`Settings for "${rcName}" updated successfully! Changes are immediately live in their workspace.`);
             setRcResetPassword('');
 
             // Reload vendors in background
-            const reloadRes = await fetch('/api/vendors');
+            const reloadRes = await apiFetch('/api/vendors');
             const reloadJson = await reloadRes.json();
             if (reloadJson.success) setVendors(reloadJson.data || []);
         } catch (err: any) {
@@ -349,7 +360,7 @@ export default function AdminVendorsPage() {
         setRemoteError('');
         setRemoteSuccess('');
         try {
-            const res = await fetch('/api/vendors', {
+            const res = await apiFetch('/api/vendors', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -358,8 +369,13 @@ export default function AdminVendorsPage() {
                     password: rcResetPassword.trim(),
                 }),
             });
-            const json = await res.json();
-            if (!json.success) throw new Error(json.message);
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json.success) {
+                if (res.status === 401) {
+                    throw new Error('Your administrator session has expired. Please refresh the page or sign in again as Super Admin.');
+                }
+                throw new Error(json.message || `Operation failed (${res.status})`);
+            }
             setRemoteSuccess(`Login credentials activated for ${rcName}! User ID: ${rcEmail.trim()}`);
             setRcResetPassword('');
             loadVendors();
@@ -398,7 +414,7 @@ export default function AdminVendorsPage() {
         setCredError('');
         setCredSuccess('');
         try {
-            const res = await fetch('/api/vendors', {
+            const res = await apiFetch('/api/vendors', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -408,8 +424,13 @@ export default function AdminVendorsPage() {
                     role: credRole,
                 }),
             });
-            const json = await res.json();
-            if (!json.success) throw new Error(json.message);
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json.success) {
+                if (res.status === 401) {
+                    throw new Error('Your administrator session has expired. Please refresh the page or sign in again as Super Admin.');
+                }
+                throw new Error(json.message || `Operation failed (${res.status})`);
+            }
 
             setCredSuccess(`Credentials activated! User ID: ${credEmail.trim()}`);
             loadVendors();
@@ -452,7 +473,7 @@ export default function AdminVendorsPage() {
         setSuccessMsg('');
 
         try {
-            const res = await fetch('/api/vendors', {
+            const res = await apiFetch('/api/vendors', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -473,8 +494,13 @@ export default function AdminVendorsPage() {
                     default_margin: Number(modalDefaultMargin) || 0,
                 }),
             });
-            const json = await res.json();
-            if (!json.success) throw new Error(json.message);
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json.success) {
+                if (res.status === 401) {
+                    throw new Error('Your administrator session has expired. Please refresh the page or sign in again as Super Admin.');
+                }
+                throw new Error(json.message || `Operation failed (${res.status})`);
+            }
 
             setSuccessMsg(`Vendor "${modalName}" created with login credentials!`);
             setDialogOpen(false);
@@ -489,7 +515,7 @@ export default function AdminVendorsPage() {
     const handleDeactivate = async (id: string) => {
         if (!confirm('Are you sure you want to deactivate this vendor?')) return;
         try {
-            const res = await fetch(`/api/vendors?id=${id}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/vendors?id=${id}`, { method: 'DELETE' });
             const json = await res.json();
             if (json.success) {
                 loadVendors();

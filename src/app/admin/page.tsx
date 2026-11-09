@@ -25,6 +25,7 @@ import {
 import Link from "next/link";
 import { companyDetails } from "@/lib/companyDetails";
 import { useAuth } from "@/context/AuthContext";
+import { apiFetch } from "@/lib/apiFetch";
 
 type DashboardStats = {
   totalQuotations: number;
@@ -47,7 +48,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch("/api/quotations?limit=100");
+        const res = await apiFetch("/api/quotations?limit=100");
         const data = await res.json();
         if (data.success) {
           const quotations = data.data || [];

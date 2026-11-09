@@ -23,6 +23,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
+import { apiFetch } from '@/lib/apiFetch';
 
 export default function VendorProfilePage() {
     return (
@@ -115,7 +116,7 @@ function VendorProfileContent() {
             formData.append('type', type);
             formData.append('vendor_id', vendor.id);
 
-            const res = await fetch('/api/upload', {
+            const res = await apiFetch('/api/upload', {
                 method: 'POST',
                 body: formData,
             });
@@ -148,7 +149,7 @@ function VendorProfileContent() {
         setSuccessMsg('');
 
         try {
-            const res = await fetch('/api/vendors', {
+            const res = await apiFetch('/api/vendors', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
