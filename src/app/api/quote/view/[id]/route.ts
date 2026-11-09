@@ -36,7 +36,7 @@ export async function GET(request: Request, context: RouteContext) {
         // 1. Resolve quotation from database by UUID or quote_number
         let query = supabase
             .from('quotations')
-            .select('*, vendors(*)');
+            .select('*, vendors:vendors!quotations_vendor_id_fkey(*)');
 
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
         if (isUUID) {
@@ -47,11 +47,25 @@ export async function GET(request: Request, context: RouteContext) {
 
         let { data: quote } = await query.maybeSingle();
 
-        // 2. Fallback: match by file name pattern if not matched by ID or quote_number
+        // 2. Resilient Fallback 1: Query without join if relationship error occurred
+        if (!quote) {
+            let simpleQuery = supabase.from('quotations').select('*');
+            if (isUUID) {
+                simpleQuery = simpleQuery.eq('id', id);
+            } else {
+                simpleQuery = simpleQuery.eq('quote_number', id);
+            }
+            const { data: simpleQuote } = await simpleQuery.maybeSingle();
+            if (simpleQuote) {
+                quote = simpleQuote;
+            }
+        }
+
+        // 3. Resilient Fallback 2: Match by file name pattern if not matched by ID or quote_number
         if (!quote) {
             const { data: byUrl } = await supabase
                 .from('quotations')
-                .select('*, vendors(*)')
+                .select('*')
                 .ilike('pdf_url', `%${id}%`)
                 .maybeSingle();
 
@@ -102,7 +116,7 @@ export async function GET(request: Request, context: RouteContext) {
             quote_number: quoteNumber,
             quote_date: quote.created_at ? new Date(quote.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : undefined,
             vendor_id: quote.vendor_id || quote.tenant_id,
-            vendor_snapshot: quote.vendor_snapshot,
+            vendor_snapshot: quote.vendor_snapshot || quote.vendors,
         };
 
         // If the client requested binary PDF download or raw PDF stream
