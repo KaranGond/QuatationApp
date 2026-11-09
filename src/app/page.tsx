@@ -53,10 +53,18 @@ import {
   Storefront,
   Logout,
   Login as LoginIcon,
+  ContentCopy,
+  Launch,
+  Check,
 } from "@mui/icons-material";
 import { useAuth } from "@/context/AuthContext";
 import AuthGuard from "@/components/AuthGuard";
 import { apiFetch } from "@/lib/apiFetch";
+import {
+  buildQuoteWhatsAppMessage,
+  openWhatsAppDirect,
+  formatWhatsAppPhoneNumber,
+} from "@/lib/whatsappShare";
 import { useReactToPrint } from "react-to-print";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -411,6 +419,18 @@ function QuotationBuilder() {
   }, [editId, editLoaded]);
 
   const [notification, setNotification] = useState<{ open: boolean; message: string; severity: "success" | "error" | "info" | "warning" }>({ open: false, message: "", severity: "success" });
+  const [whatsAppModal, setWhatsAppModal] = useState<{
+    open: boolean;
+    phone: string;
+    message: string;
+    pdfUrl: string | null;
+  }>({
+    open: false,
+    phone: '',
+    message: '',
+    pdfUrl: null,
+  });
+  const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
   const [editComponentDialog, setEditComponentDialog] = useState(false);
   const [editingComponent, setEditingComponent] = useState<QuotationComponent | null>(null);
   const [editingIndex, setEditingIndex] = useState<number>(-1);
@@ -1083,63 +1103,109 @@ function QuotationBuilder() {
     } finally { setLoading(false); }
   };
 
-  // WhatsApp handler - generates PDF, uploads to Supabase, sends via DoubleTick
+  // WhatsApp handler - generates PDF, uploads to Supabase Storage, and opens direct WhatsApp chat
   const handleSendWhatsApp = async () => {
-    if (!customerName) { setNotification({ open: true, message: "Customer name is required", severity: "error" }); return; }
-    if (!customerPhone) { setNotification({ open: true, message: "Customer phone is required for WhatsApp", severity: "error" }); return; }
-
-    setLoading(true);
-
-    if (isB2BMode) {
-      const text = `*${activeCompany.name.toUpperCase()} - B2B COMMERCIAL QUOTATION*\n\n` +
-        `*Quote Ref:* ${b2bRefNumber}\n` +
-        `*Customer:* ${customerName}\n` +
-        `*Make:* ${b2bStructureMake} (Solar Mounting Structure & BOS)\n` +
-        `*Branding:* AVAILABLE AT BEST RATE\n` +
-        `*Total Line Items:* ${b2bItems.length}\n` +
-        `*Taxable Subtotal:* ₹${formatCurrency(b2bSubtotal)}\n` +
-        `*${b2bGstLabel.replace(':', '')}:* ₹${formatCurrency(b2bGstAmount)}\n` +
-        `*Grand Total:* ₹${formatCurrency(b2bGrandTotal)}/-\n` +
-        `*Dispatch:* ${b2bDispatchLocation}\n` +
-        `*Payment:* ${b2bPaymentTerms}\n\n` +
-        `*Top Products:* \n` +
-        b2bItems.slice(0, 5).map(it => `• ${it.name} (${it.qty} ${it.unit}) @ ₹${formatCurrency(it.basePrice)} = ₹${formatCurrency(it.amount)}`).join('\n') +
-        (b2bItems.length > 5 ? `\n• ...and ${b2bItems.length - 5} more items` : '') +
-        `\n\nContact us for dispatch clearance.`;
-
-      const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
-      const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-      window.open(`https://wa.me/${fullPhone}?text=${encodeURIComponent(text)}`, '_blank');
-      await saveToDatabase(undefined, "WhatsApp Sent");
-      setNotification({ open: true, message: "Opened WhatsApp with B2B Quotation summary!", severity: "success" });
-      setLoading(false);
+    if (!customerName?.trim()) {
+      setNotification({ open: true, message: "Customer name is required", severity: "error" });
+      return;
+    }
+    if (!customerPhone?.trim()) {
+      setNotification({ open: true, message: "Customer phone is required for WhatsApp", severity: "error" });
       return;
     }
 
-    setNotification({ open: true, message: "Generating PDF and sending to WhatsApp...", severity: "info" });
+    setLoading(true);
+    setNotification({
+      open: true,
+      message: "Generating official PDF and preparing WhatsApp link...",
+      severity: "info",
+    });
 
     try {
-      const quoteData = buildQuoteData({ skipWhatsApp: false });
+      // 1. Generate PDF and upload to Supabase Storage
+      let pdfUrl: string | null = null;
+      try {
+        const quoteData = buildQuoteData({ skipWhatsApp: true });
+        const response = await apiFetch("/api/quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(quoteData),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (response.ok && result.url) {
+          pdfUrl = result.url;
+        }
+      } catch (pdfErr) {
+        console.warn("PDF generation warning, proceeding with direct WhatsApp text summary:", pdfErr);
+      }
 
-      const response = await apiFetch("/api/quote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(quoteData)
+      // 2. Save quotation to database with pdfUrl
+      await saveToDatabase(pdfUrl || undefined, "WhatsApp Shared");
+
+      // 3. Build professional WhatsApp message matching transaction format
+      const quoteNo = isB2BMode
+        ? b2bRefNumber
+        : isServiceMode
+        ? serviceRefNumber
+        : (quoteNumber || "Quote");
+
+      const messageText = buildQuoteWhatsAppMessage({
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        quoteNumber: quoteNo,
+        quoteDate: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        systemCapacityKw: isB2BMode || isServiceMode ? undefined : actualSystemSize,
+        systemType: selectedSystemType,
+        panelBrand: isB2BMode ? b2bStructureMake : effectivePanelBrand,
+        panelWattage: panelWattage || undefined,
+        totalAmount: isB2BMode ? b2bGrandTotal : isServiceMode ? serviceGrandTotal : calculations.totalAmount,
+        centralSubsidy: isB2BMode || isServiceMode ? 0 : centralSubsidy,
+        stateSubsidy: isB2BMode || isServiceMode ? 0 : stateSubsidy,
+        pdfUrl: pdfUrl,
+        vendorName: activeCompany.name,
+        vendorSignatory: activeCompany.authorizedSignatory,
+        vendorPhone: activeCompany.phone,
+        isB2B: isB2BMode,
+        b2bDetails: isB2BMode ? {
+          refNumber: b2bRefNumber,
+          make: b2bStructureMake,
+          itemCount: b2bItems.length,
+          taxableSubtotal: b2bSubtotal,
+          gstAmount: b2bGstAmount,
+          grandTotal: b2bGrandTotal,
+          dispatchLocation: b2bDispatchLocation,
+          paymentTerms: b2bPaymentTerms,
+        } : undefined,
+        isService: isServiceMode,
+        serviceDetails: isServiceMode ? {
+          refNumber: serviceRefNumber,
+          itemCount: serviceItems.length,
+          grandTotal: serviceGrandTotal,
+        } : undefined,
       });
 
-      const result = await response.json();
+      // 4. Open WhatsApp directly in new window / native app
+      openWhatsAppDirect(customerPhone, messageText);
 
-      if (response.ok) {
-        saveToDatabase(result.url, "WhatsApp Sent");
-        setNotification({ open: true, message: "Quotation PDF queued for WhatsApp delivery. It may take a moment to reach the customer.", severity: "success" });
-      } else {
-        throw new Error(result.message || "Failed to send WhatsApp");
-      }
-    } catch (error) {
+      // 5. Open dialog for easy copy or re-opening
+      setWhatsAppModal({
+        open: true,
+        phone: customerPhone.trim(),
+        message: messageText,
+        pdfUrl: pdfUrl,
+      });
+
+      setNotification({
+        open: true,
+        message: "✅ WhatsApp opened with pre-filled quotation & document link!",
+        severity: "success",
+      });
+    } catch (error: any) {
       console.error("WhatsApp error:", error);
-      setNotification({ open: true, message: (error as any).message, severity: "error" });
+      setNotification({ open: true, message: error?.message || "Failed to open WhatsApp", severity: "error" });
+    } finally {
+      setLoading(false);
     }
-    finally { setLoading(false); }
   };
 
 
@@ -2825,6 +2891,108 @@ function QuotationBuilder() {
           <Button onClick={() => setAddB2BCustomDialog(false)}>Cancel</Button>
           <Button variant="contained" color="warning" onClick={handleAddCustomB2BItem}>
             Add Item
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* WhatsApp Direct Share Modal */}
+      <Dialog
+        open={whatsAppModal.open}
+        onClose={() => setWhatsAppModal({ ...whatsAppModal, open: false })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1 }}>
+          <Box sx={{ width: 38, height: 38, borderRadius: '50%', bgcolor: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(37,211,102,0.35)' }}>
+            <WhatsApp sx={{ fontSize: 24 }} />
+          </Box>
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1e293b' }}>
+              Quotation Ready for WhatsApp
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Direct chat prepared for +{formatWhatsAppPhoneNumber(whatsAppModal.phone)}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers sx={{ py: 2 }}>
+          {whatsAppModal.pdfUrl && (
+            <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }} icon={<Check fontSize="small" />}>
+              Official PDF uploaded to cloud vault! Document link included below.
+            </Alert>
+          )}
+
+          <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', mb: 0.8 }}>
+            Message Preview (Pre-filled in WhatsApp)
+          </Typography>
+          <Box
+            sx={{
+              p: 2,
+              bgcolor: '#f8fafc',
+              borderRadius: 2,
+              border: '1px solid #e2e8f0',
+              fontFamily: 'monospace',
+              fontSize: '0.82rem',
+              whiteSpace: 'pre-wrap',
+              maxHeight: 220,
+              overflowY: 'auto',
+              color: '#1e293b',
+              lineHeight: 1.5,
+            }}
+          >
+            {whatsAppModal.message}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1, flexWrap: 'wrap' }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={copiedWhatsApp ? <Check /> : <ContentCopy />}
+            onClick={() => {
+              navigator.clipboard.writeText(whatsAppModal.message);
+              setCopiedWhatsApp(true);
+              setTimeout(() => setCopiedWhatsApp(false), 2500);
+            }}
+            sx={{ textTransform: 'none', fontWeight: 600, color: '#475569', borderColor: '#cbd5e1' }}
+          >
+            {copiedWhatsApp ? "Copied to Clipboard!" : "Copy Message"}
+          </Button>
+
+          {whatsAppModal.pdfUrl && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Launch />}
+              onClick={() => window.open(whatsAppModal.pdfUrl!, '_blank')}
+              sx={{ textTransform: 'none', fontWeight: 600, color: '#1e3a5f', borderColor: '#cbd5e1' }}
+            >
+              View PDF
+            </Button>
+          )}
+
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<WhatsApp />}
+            onClick={() => openWhatsAppDirect(whatsAppModal.phone, whatsAppModal.message)}
+            sx={{
+              bgcolor: '#25D366',
+              '&:hover': { bgcolor: '#128C7E' },
+              fontWeight: 700,
+              textTransform: 'none',
+              ml: 'auto',
+              px: 2,
+            }}
+          >
+            Open WhatsApp
+          </Button>
+
+          <Button
+            size="small"
+            onClick={() => setWhatsAppModal({ ...whatsAppModal, open: false })}
+            sx={{ color: '#64748b' }}
+          >
+            Close
           </Button>
         </DialogActions>
       </Dialog>

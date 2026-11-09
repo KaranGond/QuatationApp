@@ -21,9 +21,11 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import LogoutIcon from '@mui/icons-material/Logout';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
 import { apiFetch } from '@/lib/apiFetch';
+import { buildQuoteWhatsAppMessage, openWhatsAppDirect } from '@/lib/whatsappShare';
 
 export default function VendorDashboardPage() {
     return (
@@ -72,6 +74,29 @@ function VendorDashboardContent() {
             fetchVendorData();
         }
     }, [user, vendor, authLoading, router]);
+
+    const handleShareWhatsApp = (q: any) => {
+        if (!q.customer_phone) {
+            alert(`No phone number recorded for customer "${q.customer_name}".`);
+            return;
+        }
+
+        const message = buildQuoteWhatsAppMessage({
+            customerName: q.customer_name,
+            customerPhone: q.customer_phone,
+            quoteNumber: q.quote_number || 'Quote',
+            quoteDate: new Date(q.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+            systemCapacityKw: q.capacity_kw,
+            systemType: q.system_type_name || 'Solar Power Plant',
+            totalAmount: q.total_amount || 0,
+            pdfUrl: q.pdf_url || null,
+            vendorName: vendor?.name || 'Karan Solar Shop',
+            vendorSignatory: vendor?.authorized_signatory || 'Authorized Signatory',
+            vendorPhone: vendor?.phone || '',
+        });
+
+        openWhatsAppDirect(q.customer_phone, message);
+    };
 
     if (authLoading || (!user && loading)) {
         return (
@@ -304,6 +329,20 @@ function VendorDashboardContent() {
                                                 sx={{ textTransform: 'none', fontWeight: 700 }}
                                             >
                                                 Edit / Print
+                                            </Button>
+                                            <Button
+                                                size="small"
+                                                variant="contained"
+                                                onClick={() => handleShareWhatsApp(q)}
+                                                startIcon={<WhatsAppIcon />}
+                                                sx={{
+                                                    bgcolor: '#25D366',
+                                                    '&:hover': { bgcolor: '#128C7E' },
+                                                    textTransform: 'none',
+                                                    fontWeight: 700,
+                                                }}
+                                            >
+                                                WhatsApp
                                             </Button>
                                         </Box>
                                     </Box>

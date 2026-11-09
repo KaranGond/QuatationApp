@@ -29,6 +29,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/apiFetch";
+import { buildQuoteWhatsAppMessage, openWhatsAppDirect } from "@/lib/whatsappShare";
 
 type Quotation = {
     id: string;
@@ -107,6 +108,31 @@ export default function QuotationsAdminPage() {
     const handleEdit = (quotation: Quotation) => {
         // Navigate to home page with edit parameter
         router.push(`/?edit=${quotation.id}`);
+    };
+
+    const handleShareWhatsApp = (q: Quotation) => {
+        if (!q.customer_phone) {
+            alert(`No phone number recorded for customer "${q.customer_name}".`);
+            return;
+        }
+
+        const vendorObj = vendors.find(v => v.id === q.vendor_id) || authVendor;
+
+        const message = buildQuoteWhatsAppMessage({
+            customerName: q.customer_name,
+            customerPhone: q.customer_phone,
+            quoteNumber: q.quote_number || 'Quote',
+            quoteDate: formatDate(q.created_at),
+            systemCapacityKw: q.capacity_kw,
+            systemType: q.system_type_name || 'Solar Power Plant',
+            totalAmount: q.total_amount || 0,
+            pdfUrl: q.pdf_url || null,
+            vendorName: vendorObj?.name || 'Karan Solar Shop',
+            vendorSignatory: vendorObj?.authorized_signatory || 'Authorized Signatory',
+            vendorPhone: vendorObj?.phone || '',
+        });
+
+        openWhatsAppDirect(q.customer_phone, message);
     };
 
     const formatCurrency = (amount: number | null) => {
@@ -456,7 +482,7 @@ export default function QuotationsAdminPage() {
                                                         </IconButton>
                                                     </Tooltip>
                                                     <Tooltip title="Send via WhatsApp">
-                                                        <IconButton size="small" color="success">
+                                                        <IconButton size="small" color="success" onClick={() => handleShareWhatsApp(quotation)}>
                                                             <WhatsApp fontSize="small" />
                                                         </IconButton>
                                                     </Tooltip>

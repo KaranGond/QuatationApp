@@ -217,7 +217,11 @@ export async function POST(request: Request) {
     }
 
     if (!quoteData.skipWhatsApp) {
-      await sendWhatsAppMessage(quoteData.customerInfo.phone, pdfUrlForWhatsApp);
+      try {
+        await sendWhatsAppMessage(quoteData.customerInfo.phone, pdfUrlForWhatsApp);
+      } catch (waErr: any) {
+        console.warn('DoubleTick WhatsApp automated delivery failed (falling back to direct wa.me):', waErr?.message);
+      }
     }
 
     return NextResponse.json({ message: 'Quotation sent successfully!', url: urlData.publicUrl, totals: { subtotal, gstAmount, total, discount, grandTotal } });

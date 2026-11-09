@@ -5,7 +5,10 @@ export async function sendWhatsAppMessage(phone: string, pdfUrl: string) {
   try {
     const apiKey = process.env.DOUBLETICK_API_KEY;
     const senderPhone = process.env.DOUBLETICK_SENDER_PHONE;
-    if (!apiKey || !senderPhone) throw new Error('Doubletick API Key or Sender Phone is not set');
+    if (!apiKey || !senderPhone) {
+      console.log('ℹ️ DoubleTick API not configured. WhatsApp will be shared directly via wa.me links.');
+      return;
+    }
     let cleanedPhone = phone.replace(/[^0-9]/g, '');
     // Strip leading country code if present (91XXXXXXXXXX)
     if (cleanedPhone.length === 12 && cleanedPhone.startsWith('91')) {
