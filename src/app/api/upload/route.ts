@@ -65,8 +65,8 @@ export async function POST(request: Request) {
         // Clean filename and extension
         const rawExt = file.name.split('.').pop()?.toLowerCase() || 'png';
         const ext = ['png', 'jpg', 'jpeg', 'webp', 'svg'].includes(rawExt) ? rawExt : 'png';
-        const cleanType = ['logo', 'signature', 'stamp', 'qr', 'barcode'].includes(type) ? type : 'asset';
-        const storageType = cleanType === 'barcode' ? 'qr' : cleanType as any;
+        const cleanType = ['logo', 'signature', 'stamp', 'stamp_signature', 'qr', 'barcode'].includes(type) ? type : 'asset';
+        const storageType = cleanType === 'barcode' ? 'qr' : (cleanType === 'stamp_signature' ? 'signature' : cleanType as any);
 
         const fileName = getTenantStoragePath(
             nodeId,
@@ -98,12 +98,10 @@ export async function POST(request: Request) {
             if (cleanType === 'logo') {
                 updatePayload.logo_url = publicUrl;
                 updatedColumn = 'logo_url';
-            } else if (cleanType === 'signature') {
+            } else if (cleanType === 'signature' || cleanType === 'stamp' || cleanType === 'stamp_signature') {
                 updatePayload.signature_url = publicUrl;
-                updatedColumn = 'signature_url';
-            } else if (cleanType === 'stamp') {
                 updatePayload.stamp_url = publicUrl;
-                updatedColumn = 'stamp_url';
+                updatedColumn = 'signature_url';
             } else if (cleanType === 'qr' || cleanType === 'barcode') {
                 updatePayload.qr_code_url = publicUrl;
                 updatedColumn = 'qr_code_url';

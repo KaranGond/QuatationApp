@@ -40,7 +40,6 @@ function VendorProfileContent() {
     const [saving, setSaving] = useState(false);
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const [uploadingSignature, setUploadingSignature] = useState(false);
-    const [uploadingStamp, setUploadingStamp] = useState(false);
     const [uploadingQr, setUploadingQr] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
@@ -72,7 +71,6 @@ function VendorProfileContent() {
 
     const logoInputRef = useRef<HTMLInputElement>(null);
     const signatureInputRef = useRef<HTMLInputElement>(null);
-    const stampInputRef = useRef<HTMLInputElement>(null);
     const qrInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -106,8 +104,7 @@ function VendorProfileContent() {
         if (!vendor?.id) return;
 
         if (type === 'logo') setUploadingLogo(true);
-        if (type === 'signature') setUploadingSignature(true);
-        if (type === 'stamp') setUploadingStamp(true);
+        if (type === 'signature' || type === 'stamp') setUploadingSignature(true);
         if (type === 'qr') setUploadingQr(true);
 
         try {
@@ -125,17 +122,18 @@ function VendorProfileContent() {
             if (!json.success) throw new Error(json.message);
 
             if (type === 'logo') setLogoUrl(json.url);
-            if (type === 'signature') setSignatureUrl(json.url);
-            if (type === 'stamp') setStampUrl(json.url);
+            if (type === 'signature' || type === 'stamp') {
+                setSignatureUrl(json.url);
+                setStampUrl(json.url);
+            }
             if (type === 'qr') setQrCodeUrl(json.url);
 
-            setSuccessMsg(`${type.toUpperCase()} uploaded successfully to your private tenant vault! Remember to click Save below.`);
+            setSuccessMsg(`${type === 'signature' ? 'STAMP & SIGNATURE' : type.toUpperCase()} uploaded successfully to your private tenant vault! Remember to click Save below.`);
         } catch (err: any) {
             setErrorMsg(err.message || 'Failed to upload asset');
         } finally {
             if (type === 'logo') setUploadingLogo(false);
-            if (type === 'signature') setUploadingSignature(false);
-            if (type === 'stamp') setUploadingStamp(false);
+            if (type === 'signature' || type === 'stamp') setUploadingSignature(false);
             if (type === 'qr') setUploadingQr(false);
         }
     };
@@ -268,17 +266,20 @@ function VendorProfileContent() {
 
                             <Grid container spacing={2.5}>
                                 {/* 1. Company Logo */}
-                                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                                    <Box sx={{ p: 2, borderRadius: 2, border: '1px dashed #cbd5e1', bgcolor: '#fff', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#1e293b' }}>
+                                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                                    <Box sx={{ p: 2.5, borderRadius: 2.5, border: '1px dashed #cbd5e1', bgcolor: '#fff', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 0.5, color: '#1e293b' }}>
                                             Company Logo
                                         </Typography>
-                                        <Box sx={{ height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5, bgcolor: '#f8fafc', borderRadius: 1.5, p: 1 }}>
+                                        <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1.5, fontSize: 11 }}>
+                                            Displayed on top header of quotes
+                                        </Typography>
+                                        <Box sx={{ height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2, bgcolor: '#f8fafc', borderRadius: 2, p: 1, border: '1px solid #f1f5f9' }}>
                                             <Box
                                                 component="img"
                                                 src={logoUrl || '/logo.png'}
                                                 alt="Logo"
-                                                sx={{ maxHeight: 75, maxWidth: '100%', objectFit: 'contain' }}
+                                                sx={{ maxHeight: 85, maxWidth: '100%', objectFit: 'contain' }}
                                                 onError={(e: any) => { e.target.src = '/logo.png'; }}
                                             />
                                         </Box>
@@ -298,63 +299,28 @@ function VendorProfileContent() {
                                             startIcon={uploadingLogo ? <CircularProgress size={14} /> : <CloudUploadIcon />}
                                             onClick={() => logoInputRef.current?.click()}
                                             disabled={uploadingLogo}
-                                            sx={{ textTransform: 'none', fontWeight: 600, fontSize: 11 }}
+                                            sx={{ textTransform: 'none', fontWeight: 700, fontSize: 12, py: 0.8 }}
                                         >
                                             {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
                                         </Button>
                                     </Box>
                                 </Grid>
 
-                                {/* 2. Stamp / Seal */}
-                                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                                    <Box sx={{ p: 2, borderRadius: 2, border: '1px dashed #cbd5e1', bgcolor: '#fff', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#1e293b' }}>
-                                            Official Stamp / Seal
+                                {/* 2. Official Stamp & Signature (Merged Seal) */}
+                                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                                    <Box sx={{ p: 2.5, borderRadius: 2.5, border: '1px dashed #cbd5e1', bgcolor: '#fff', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 0.5, color: '#1e293b' }}>
+                                            Official Stamp & Signature
                                         </Typography>
-                                        <Box sx={{ height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5, bgcolor: '#f8fafc', borderRadius: 1.5, p: 1 }}>
+                                        <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1.5, fontSize: 11 }}>
+                                            Upload merged rubber stamp with signature
+                                        </Typography>
+                                        <Box sx={{ height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2, bgcolor: '#f8fafc', borderRadius: 2, p: 1, border: '1px solid #f1f5f9' }}>
                                             <Box
                                                 component="img"
-                                                src={stampUrl || '/stamp.png'}
-                                                alt="Stamp"
-                                                sx={{ maxHeight: 75, maxWidth: '100%', objectFit: 'contain' }}
-                                                onError={(e: any) => { e.target.src = '/stamp.png'; }}
-                                            />
-                                        </Box>
-                                        <input
-                                            type="file"
-                                            ref={stampInputRef}
-                                            accept="image/*"
-                                            style={{ display: 'none' }}
-                                            onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (file) handleFileUpload(file, 'stamp');
-                                            }}
-                                        />
-                                        <Button
-                                            size="small"
-                                            variant="outlined"
-                                            startIcon={uploadingStamp ? <CircularProgress size={14} /> : <CloudUploadIcon />}
-                                            onClick={() => stampInputRef.current?.click()}
-                                            disabled={uploadingStamp}
-                                            sx={{ textTransform: 'none', fontWeight: 600, fontSize: 11 }}
-                                        >
-                                            {uploadingStamp ? 'Uploading...' : 'Upload Stamp'}
-                                        </Button>
-                                    </Box>
-                                </Grid>
-
-                                {/* 3. Signature */}
-                                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                                    <Box sx={{ p: 2, borderRadius: 2, border: '1px dashed #cbd5e1', bgcolor: '#fff', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#1e293b' }}>
-                                            Authorized Signature
-                                        </Typography>
-                                        <Box sx={{ height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5, bgcolor: '#f8fafc', borderRadius: 1.5, p: 1 }}>
-                                            <Box
-                                                component="img"
-                                                src={signatureUrl || '/signature.png'}
-                                                alt="Signature"
-                                                sx={{ maxHeight: 75, maxWidth: '100%', objectFit: 'contain' }}
+                                                src={signatureUrl || stampUrl || '/signature.png'}
+                                                alt="Stamp & Signature"
+                                                sx={{ maxHeight: 85, maxWidth: '100%', objectFit: 'contain' }}
                                                 onError={(e: any) => { e.target.src = '/signature.png'; }}
                                             />
                                         </Box>
@@ -371,33 +337,37 @@ function VendorProfileContent() {
                                         <Button
                                             size="small"
                                             variant="outlined"
+                                            color="primary"
                                             startIcon={uploadingSignature ? <CircularProgress size={14} /> : <CloudUploadIcon />}
                                             onClick={() => signatureInputRef.current?.click()}
                                             disabled={uploadingSignature}
-                                            sx={{ textTransform: 'none', fontWeight: 600, fontSize: 11 }}
+                                            sx={{ textTransform: 'none', fontWeight: 700, fontSize: 12, py: 0.8 }}
                                         >
-                                            {uploadingSignature ? 'Uploading...' : 'Upload Signature'}
+                                            {uploadingSignature ? 'Uploading...' : 'Upload Stamp & Signature'}
                                         </Button>
                                     </Box>
                                 </Grid>
 
-                                {/* 4. Payment Barcode / UPI QR Code */}
-                                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                                    <Box sx={{ p: 2, borderRadius: 2, border: '1px dashed #cbd5e1', bgcolor: '#fff', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#1e293b' }}>
-                                            Payment Barcode / QR
+                                {/* 3. Payment Barcode / UPI QR Code */}
+                                <Grid size={{ xs: 12, sm: 12, md: 4 }}>
+                                    <Box sx={{ p: 2.5, borderRadius: 2.5, border: '1px dashed #cbd5e1', bgcolor: '#fff', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 0.5, color: '#1e293b' }}>
+                                            Payment Barcode / QR Code
                                         </Typography>
-                                        <Box sx={{ height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5, bgcolor: '#f8fafc', borderRadius: 1.5, p: 1 }}>
+                                        <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1.5, fontSize: 11 }}>
+                                            Customer scans this QR on quotation to pay
+                                        </Typography>
+                                        <Box sx={{ height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2, bgcolor: '#f8fafc', borderRadius: 2, p: 1, border: '1px solid #f1f5f9' }}>
                                             {qrCodeUrl ? (
                                                 <Box
                                                     component="img"
                                                     src={qrCodeUrl}
                                                     alt="Payment QR"
-                                                    sx={{ maxHeight: 75, maxWidth: '100%', objectFit: 'contain' }}
+                                                    sx={{ maxHeight: 85, maxWidth: '100%', objectFit: 'contain' }}
                                                 />
                                             ) : (
                                                 <Typography variant="caption" sx={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                                                    {upiId ? `Auto-generated from ${upiId}` : 'No Barcode Uploaded'}
+                                                    {upiId ? `Auto-generated from ${upiId}` : 'No Custom QR Uploaded (Using Default)'}
                                                 </Typography>
                                             )}
                                         </Box>
@@ -418,9 +388,9 @@ function VendorProfileContent() {
                                             startIcon={uploadingQr ? <CircularProgress size={14} /> : <CloudUploadIcon />}
                                             onClick={() => qrInputRef.current?.click()}
                                             disabled={uploadingQr}
-                                            sx={{ textTransform: 'none', fontWeight: 600, fontSize: 11 }}
+                                            sx={{ textTransform: 'none', fontWeight: 700, fontSize: 12, py: 0.8 }}
                                         >
-                                            {uploadingQr ? 'Uploading...' : 'Upload Barcode/QR'}
+                                            {uploadingQr ? 'Uploading...' : 'Upload QR Code'}
                                         </Button>
                                     </Box>
                                 </Grid>

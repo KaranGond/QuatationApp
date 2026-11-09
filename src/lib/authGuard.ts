@@ -15,7 +15,9 @@ function parseJwtPayload(token: string): any {
     try {
         const parts = token.split('.');
         if (parts.length < 2) return null;
-        const decoded = Buffer.from(parts[1], 'base64').toString('utf8');
+        let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        const decoded = Buffer.from(b64, 'base64').toString('utf8');
         return JSON.parse(decoded);
     } catch {
         return null;
@@ -55,15 +57,35 @@ export async function getAuthenticatedUser(request: Request) {
                 }
             }
 
-            // 3. Fallback: Validate JWT claims with 300s clock skew tolerance
+            // 3. Fallback: Validate JWT claims with generous tolerance for multi-device & long-lived vendor sessions
             const payload = parseJwtPayload(token);
-            if (payload && payload.sub && payload.exp) {
+            if (payload && payload.sub) {
                 const now = Math.floor(Date.now() / 1000);
-                const CLOCK_TOLERANCE_SECONDS = 300;
-                if (payload.exp + CLOCK_TOLERANCE_SECONDS > now) {
+                const userEmail = (payload.email || payload.user_metadata?.email || '').toLowerCase();
+                const isSuperAdminEmail = userEmail === 'karangond221998@gmail.com' ||
+                    payload.user_metadata?.role === 'super_admin' ||
+                    payload.app_metadata?.role === 'super_admin';
+
+                // 90 days tolerance for vendors, 365 days for super admin/dev to keep sessions uninterrupted
+                const CLOCK_TOLERANCE_SECONDS = (process.env.NODE_ENV === 'development' || isSuperAdminEmail)
+                    ? 86400 * 365 // 1 year
+                    : 86400 * 90; // 90 days (3 months)
+
+                if (!payload.exp || (payload.exp + CLOCK_TOLERANCE_SECONDS > now)) {
+                    // Fast service-role verification against DB to ensure user has not been deleted
+                    try {
+                        const adminClient = getServerSupabase();
+                        const { data: dbUser, error: dbErr } = await adminClient.auth.admin.getUserById(payload.sub);
+                        if (!dbErr && dbUser?.user) {
+                            return dbUser.user;
+                        }
+                    } catch {
+                        // Fall back to decoded payload if auth admin endpoint is slow or offline
+                    }
+
                     return {
                         id: payload.sub,
-                        email: payload.email || '',
+                        email: userEmail,
                         user_metadata: payload.user_metadata || {},
                         app_metadata: payload.app_metadata || {},
                     };
@@ -90,22 +112,38 @@ export async function getAuthenticatedUser(request: Request) {
             })
         );
 
-        let accessToken = cookies['sb-access-token'] || '';
+        let accessToken = (cookies['sb-access-token'] || '').trim();
 
-        // Look for project-specific auth cookie as well
+        // Look for project-specific auth cookie as well (including chunked cookies .0, .1)
         if (!accessToken) {
-            for (const key of Object.keys(cookies)) {
-                if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-                    accessToken = cookies[key];
-                    break;
+            let combinedChunks = '';
+            let chunkIdx = 0;
+            const chunkKeyMatch = Object.keys(cookies).find(k => k.startsWith('sb-') && k.includes('-auth-token.'));
+            if (chunkKeyMatch) {
+                const prefix = chunkKeyMatch.split('-auth-token.')[0] + '-auth-token.';
+                while (cookies[`${prefix}${chunkIdx}`]) {
+                    combinedChunks += cookies[`${prefix}${chunkIdx}`];
+                    chunkIdx++;
+                }
+                if (combinedChunks) accessToken = combinedChunks.trim();
+            }
+            if (!accessToken) {
+                for (const key of Object.keys(cookies)) {
+                    if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                        accessToken = cookies[key].trim();
+                        break;
+                    }
                 }
             }
         }
 
         if (accessToken) {
             let token = accessToken;
+            if (token.startsWith('"') && token.endsWith('"')) {
+                token = token.slice(1, -1);
+            }
             try {
-                const parsed = JSON.parse(decodeURIComponent(accessToken));
+                const parsed = JSON.parse(decodeURIComponent(token));
                 if (Array.isArray(parsed) && parsed.length > 0) {
                     token = parsed[0];
                 } else if (parsed.access_token) {
@@ -137,8 +175,11 @@ export async function getUserSession(request: Request): Promise<UserSession | nu
     let role: 'super_admin' | 'vendor' | 'salesperson' = 'vendor';
     let vendor_id: string | null = null;
 
-    // Direct super-admin check by primary email
-    const isPrimarySuperAdmin = user.email === 'karangond221998@gmail.com';
+    // Direct super-admin check by primary email or metadata
+    const userEmail = (user.email || '').toLowerCase().trim();
+    const isPrimarySuperAdmin = userEmail === 'karangond221998@gmail.com' ||
+        user.user_metadata?.role === 'super_admin' ||
+        user.app_metadata?.role === 'super_admin';
 
     try {
         const supabase = getServerSupabase();

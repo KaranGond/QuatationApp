@@ -29,7 +29,7 @@ test('WhatsApp Phone Number Formatting', async (t) => {
 });
 
 test('WhatsApp Message Builder - Standard Rooftop Quote', async (t) => {
-    await t.test('includes customer name, quote number, capacity, amount and PDF link', () => {
+    await t.test('includes customer name, quote number, capacity, amount and PDF link without asterisks or emojis', () => {
         const msg = buildQuoteWhatsAppMessage({
             customerName: 'Krishna Rai',
             customerPhone: '89606962028',
@@ -48,15 +48,18 @@ test('WhatsApp Message Builder - Standard Rooftop Quote', async (t) => {
             vendorPhone: '+91 9005770466',
         });
 
-        assert.match(msg, /Dear \*Krishna Rai\*/);
-        assert.match(msg, /KSS-2026-0042/);
-        assert.match(msg, /5 kW \(On-grid\)/);
-        assert.match(msg, /Adani Solar 550Wp/);
-        assert.match(msg, /₹2,60,000/);
-        assert.match(msg, /₹1,08,000/); // Total subsidy
+        // Strict assertion: zero asterisks (*)
+        assert.equal(msg.includes('*'), false, 'Message should not contain asterisks (*) symbols');
+        // Strict assertion: professional greeting without markdown
+        assert.match(msg, /Dear Krishna Rai,/);
+        assert.match(msg, /Quotation No: KSS-2026-0042/);
+        assert.match(msg, /Capacity: 5 kW \(On-grid\)/);
+        assert.match(msg, /Solar Panels: Adani Solar 550Wp/);
+        assert.match(msg, /Total System Amount: ₹2,60,000\/-/);
+        assert.match(msg, /Govt Subsidy \(DBT\): ₹1,08,000\/-/);
+        assert.match(msg, /Net Investment: ₹1,52,000\/-/);
         assert.match(msg, /https:\/\/storage\.supabase\.co\/quotes\/KSS-0042\.pdf/);
-        assert.match(msg, /Karan Solar Shop/);
-        assert.match(msg, /9005770466/);
+        assert.match(msg, /Sincerely,\nKaran Solar Shop\nKaran Gond\nPhone: \+91 9005770466/);
     });
 });
 
@@ -66,3 +69,4 @@ test('WhatsApp Direct wa.me URL Generation', async (t) => {
         assert.ok(url.startsWith('https://wa.me/919876543210?text=Hello%20Solar%20Quote'));
     });
 });
+

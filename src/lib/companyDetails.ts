@@ -22,6 +22,7 @@ export const companies = [
         logo: "/logo.png",
         signature: "/signature.png",
         stamp: null,
+        qr_code_url: "/payment.png",
         authorizedSignatory: "Karan Gond",
     }
 ];

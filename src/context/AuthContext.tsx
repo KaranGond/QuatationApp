@@ -55,7 +55,8 @@ const syncAuthCookie = (token: string | null) => {
     const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
     const secureFlag = isHttps ? '; Secure' : '';
     if (token) {
-        document.cookie = `sb-access-token=${token}; path=/; max-age=604800; SameSite=Lax${secureFlag}`;
+        // Long-lived 1-year (365 days) persistent session cookie
+        document.cookie = `sb-access-token=${token}; path=/; max-age=31536000; SameSite=Lax${secureFlag}`;
     } else {
         document.cookie = `sb-access-token=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
     }
@@ -210,7 +211,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signOut = async () => {
-        await supabase.auth.signOut();
+        try {
+            // Sign out ONLY from the current device, keeping other devices logged in
+            await supabase.auth.signOut({ scope: 'local' });
+        } catch {
+            // Ignore offline errors
+        }
         syncAuthCookie(null);
         setUser(null);
         setRole(null);

@@ -213,8 +213,9 @@ function QuotationBuilder() {
           upiId: foundVendor.upi_id || "",
         },
         logo: foundVendor.logo_url || "/logo.png",
-        signature: foundVendor.signature_url || "/signature.png",
-        stamp: foundVendor.stamp_url || null,
+        signature: foundVendor.signature_url || foundVendor.stamp_url || "/signature.png",
+        stamp: foundVendor.stamp_url || foundVendor.signature_url || null,
+        qr_code_url: foundVendor.qr_code_url || null,
         authorizedSignatory: foundVendor.authorized_signatory || "Authorized Signatory",
         defaultMargin: foundVendor.default_margin || 0,
         componentsSettings: foundVendor.components_settings || {},
@@ -945,8 +946,10 @@ function QuotationBuilder() {
         setEditingQuotationId(result.data.id);
       }
       console.log(`Quotation ${isEditing ? 'updated' : 'created'} in database`);
+      return result.data;
     } catch (error) {
       console.error("Save failed:", error);
+      return null;
     }
   };
 
@@ -1140,14 +1143,20 @@ function QuotationBuilder() {
       }
 
       // 2. Save quotation to database with pdfUrl
-      await saveToDatabase(pdfUrl || undefined, "WhatsApp Shared");
+      const savedRecord = await saveToDatabase(pdfUrl || undefined, "WhatsApp Shared");
 
       // 3. Build professional WhatsApp message matching transaction format
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
       const quoteNo = isB2BMode
         ? b2bRefNumber
         : isServiceMode
         ? serviceRefNumber
-        : (quoteNumber || "Quote");
+        : (savedRecord?.quote_number || quoteNumber || "Quote");
+
+      // Mask raw Supabase BaaS storage URL behind your branded website domain
+      const brandedPdfUrl = (savedRecord?.quote_number || savedRecord?.id)
+        ? `${origin}/api/quote/view/${encodeURIComponent(savedRecord.quote_number || savedRecord.id)}`
+        : (pdfUrl || undefined);
 
       const messageText = buildQuoteWhatsAppMessage({
         customerName: customerName.trim(),
@@ -1161,7 +1170,7 @@ function QuotationBuilder() {
         totalAmount: isB2BMode ? b2bGrandTotal : isServiceMode ? serviceGrandTotal : calculations.totalAmount,
         centralSubsidy: isB2BMode || isServiceMode ? 0 : centralSubsidy,
         stateSubsidy: isB2BMode || isServiceMode ? 0 : stateSubsidy,
-        pdfUrl: pdfUrl,
+        pdfUrl: brandedPdfUrl || pdfUrl,
         vendorName: activeCompany.name,
         vendorSignatory: activeCompany.authorizedSignatory,
         vendorPhone: activeCompany.phone,
@@ -1192,7 +1201,7 @@ function QuotationBuilder() {
         open: true,
         phone: customerPhone.trim(),
         message: messageText,
-        pdfUrl: pdfUrl,
+        pdfUrl: brandedPdfUrl || pdfUrl,
       });
 
       setNotification({
@@ -2774,14 +2783,18 @@ function QuotationBuilder() {
               </Box>
               <Box sx={{ textAlign: "right", position: "relative" }}>
                 <Typography sx={{ fontSize: "10.5px", fontWeight: 900, color: "#1e3a5f", mb: 0, textDecoration: "underline", textDecorationColor: "#eab308", textUnderlineOffset: 3 }}>For {activeCompany.name}</Typography>
-                <Box sx={{ position: "relative", minHeight: 52, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-                  {(activeCompany as any).stamp && (activeCompany as any).signature !== '/signature.png' && (
-                    <Box component="img" src={resolveMediaUrl((activeCompany as any).stamp)} alt="Stamp" sx={{ width: 68, height: 68, objectFit: "contain", position: "absolute", right: 36, top: -10, opacity: 0.85, pointerEvents: "none" }} onError={(e: any) => e.target.style.display = 'none'} />
-                  )}
-                  <Box component="img" src={resolveMediaUrl((activeCompany as any).signature || '/signature.png')} alt="Authorized Signatory" sx={{ width: 155, height: 55, objectFit: "contain", display: "block", ml: "auto", my: 0.2, position: "relative", zIndex: 1 }} onError={(e: any) => e.target.style.display = 'none'} />
+                <Box sx={{ minHeight: 56, display: "flex", alignItems: "center", justifyContent: "flex-end", my: 0.3 }}>
+                  <Box 
+                    component="img" 
+                    src={resolveMediaUrl((activeCompany as any).signature || (activeCompany as any).stamp || '/signature.png')} 
+                    alt="Official Stamp & Signature" 
+                    sx={{ maxHeight: 62, maxWidth: 180, objectFit: "contain", display: "block", ml: "auto", mixBlendMode: "multiply" }} 
+                    onError={(e: any) => e.target.style.display = 'none'} 
+                  />
                 </Box>
-                <Box sx={{ width: 140, height: 1, bgcolor: "#cbd5e1", mb: 0.2, ml: "auto" }} />
-                <Typography sx={{ fontSize: "7.5px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8 }}>Authorized Signatory</Typography>
+                <Box sx={{ width: 150, height: 1.5, bgcolor: "#0f172a", mb: 0.2, ml: "auto" }} />
+                <Typography sx={{ fontSize: "7.5px", color: "#1e3a5f", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>Authorized Stamp & Signature</Typography>
+                <Typography sx={{ fontSize: "8.5px", color: "#334155", fontWeight: 700 }}>{activeCompany.authorizedSignatory}</Typography>
               </Box>
             </Box>
           </>)}

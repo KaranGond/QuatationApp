@@ -81,6 +81,11 @@ function VendorDashboardContent() {
             return;
         }
 
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const brandedPdfUrl = (q.quote_number || q.id)
+            ? `${origin}/api/quote/view/${encodeURIComponent(q.quote_number || q.id)}`
+            : (q.pdf_url || null);
+
         const message = buildQuoteWhatsAppMessage({
             customerName: q.customer_name,
             customerPhone: q.customer_phone,
@@ -89,7 +94,7 @@ function VendorDashboardContent() {
             systemCapacityKw: q.capacity_kw,
             systemType: q.system_type_name || 'Solar Power Plant',
             totalAmount: q.total_amount || 0,
-            pdfUrl: q.pdf_url || null,
+            pdfUrl: brandedPdfUrl || q.pdf_url || null,
             vendorName: vendor?.name || 'Karan Solar Shop',
             vendorSignatory: vendor?.authorized_signatory || 'Authorized Signatory',
             vendorPhone: vendor?.phone || '',

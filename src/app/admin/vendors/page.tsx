@@ -125,7 +125,6 @@ export default function AdminVendorsPage() {
     // Upload refs for remote control
     const rcLogoInputRef = useRef<HTMLInputElement>(null);
     const rcSigInputRef = useRef<HTMLInputElement>(null);
-    const rcStampInputRef = useRef<HTMLInputElement>(null);
     const rcQrInputRef = useRef<HTMLInputElement>(null);
     const [uploadingRcAsset, setUploadingRcAsset] = useState<string | null>(null);
 
@@ -231,18 +230,20 @@ export default function AdminVendorsPage() {
 
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json.success) {
-                if (res.status === 401) {
-                    throw new Error('Your administrator session has expired. Please refresh the page or sign in again as Super Admin.');
+                if (res.status === 401 || json.message?.includes('Authentication required')) {
+                    throw new Error('Your administrator session has expired or requires sign in. Please refresh the page or sign in again as Super Admin.');
                 }
                 throw new Error(json.message || `Operation failed (${res.status})`);
             }
 
             if (type === 'logo') setRcLogoUrl(json.url);
-            if (type === 'signature') setRcSignatureUrl(json.url);
-            if (type === 'stamp') setRcStampUrl(json.url);
+            if (type === 'signature' || type === 'stamp') {
+                setRcSignatureUrl(json.url);
+                setRcStampUrl(json.url);
+            }
             if (type === 'qr') setRcQrCodeUrl(json.url);
 
-            setRemoteSuccess(`${type.toUpperCase()} uploaded to tenant vault and updated successfully!`);
+            setRemoteSuccess(`${type === 'signature' ? 'STAMP & SIGNATURE' : type.toUpperCase()} uploaded to tenant vault and updated successfully!`);
         } catch (err: any) {
             setRemoteError(err.message || 'Upload failed');
         } finally {
@@ -302,8 +303,8 @@ export default function AdminVendorsPage() {
 
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json.success) {
-                if (res.status === 401) {
-                    throw new Error('Your administrator session has expired. Please refresh the page or sign in again as Super Admin.');
+                if (res.status === 401 || json.message?.includes('Authentication required')) {
+                    throw new Error('Your administrator session has expired or requires sign in. Please refresh the page or sign in again as Super Admin.');
                 }
                 throw new Error(json.message || `Operation failed (${res.status})`);
             }
@@ -371,8 +372,8 @@ export default function AdminVendorsPage() {
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json.success) {
-                if (res.status === 401) {
-                    throw new Error('Your administrator session has expired. Please refresh the page or sign in again as Super Admin.');
+                if (res.status === 401 || json.message?.includes('Authentication required')) {
+                    throw new Error('Your administrator session has expired or requires sign in. Please refresh the page or sign in again as Super Admin.');
                 }
                 throw new Error(json.message || `Operation failed (${res.status})`);
             }
@@ -426,8 +427,8 @@ export default function AdminVendorsPage() {
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json.success) {
-                if (res.status === 401) {
-                    throw new Error('Your administrator session has expired. Please refresh the page or sign in again as Super Admin.');
+                if (res.status === 401 || json.message?.includes('Authentication required')) {
+                    throw new Error('Your administrator session has expired or requires sign in. Please refresh the page or sign in again as Super Admin.');
                 }
                 throw new Error(json.message || `Operation failed (${res.status})`);
             }
@@ -496,8 +497,8 @@ export default function AdminVendorsPage() {
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json.success) {
-                if (res.status === 401) {
-                    throw new Error('Your administrator session has expired. Please refresh the page or sign in again as Super Admin.');
+                if (res.status === 401 || json.message?.includes('Authentication required')) {
+                    throw new Error('Your administrator session has expired or requires sign in. Please refresh the page or sign in again as Super Admin.');
                 }
                 throw new Error(json.message || `Operation failed (${res.status})`);
             }
@@ -1083,72 +1084,56 @@ export default function AdminVendorsPage() {
                                             </Typography>
 
                                             <Grid container spacing={2}>
-                                                {/* Logo */}
-                                                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                                                    <Box sx={{ p: 1.5, borderRadius: 2, border: '1px dashed #cbd5e1', textAlign: 'center', bgcolor: '#f8fafc', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                                        <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}>
+                                                {/* 1. Shop Logo */}
+                                                <Grid size={{ xs: 12, sm: 12, md: 4 }}>
+                                                    <Box sx={{ p: 2, borderRadius: 2, border: "1px dashed #cbd5e1", textAlign: "center", bgcolor: "#f8fafc", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                                                        <Typography variant="caption" sx={{ fontWeight: 700, display: "block", mb: 0.5, color: "#1e293b" }}>
                                                             Shop Logo
                                                         </Typography>
-                                                        <Box sx={{ height: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1, bgcolor: '#fff', borderRadius: 1 }}>
-                                                            <Box component="img" src={rcLogoUrl || '/logo.png'} alt="Logo" sx={{ maxHeight: 60, maxWidth: '100%', objectFit: 'contain' }} onError={(e: any) => { e.target.src = '/logo.png'; }} />
+                                                        <Box sx={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", mb: 1.5, bgcolor: "#fff", borderRadius: 1.5, p: 1, border: "1px solid #e2e8f0" }}>
+                                                            <Box component="img" src={rcLogoUrl || "/logo.png"} alt="Logo" sx={{ maxHeight: 70, maxWidth: "100%", objectFit: "contain" }} onError={(e: any) => { e.target.src = "/logo.png"; }} />
                                                         </Box>
-                                                        <input type="file" ref={rcLogoInputRef} accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRemoteUpload(f, 'logo'); }} />
-                                                        <Button size="small" variant="outlined" startIcon={uploadingRcAsset === 'logo' ? <CircularProgress size={12} /> : <CloudUploadIcon sx={{ fontSize: 13 }} />} onClick={() => rcLogoInputRef.current?.click()} disabled={!!uploadingRcAsset} sx={{ fontSize: 10, textTransform: 'none', py: 0.2 }}>
-                                                            {uploadingRcAsset === 'logo' ? 'Uploading...' : 'Replace'}
+                                                        <input type="file" ref={rcLogoInputRef} accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRemoteUpload(f, "logo"); }} />
+                                                        <Button size="small" variant="outlined" startIcon={uploadingRcAsset === "logo" ? <CircularProgress size={14} /> : <CloudUploadIcon sx={{ fontSize: 14 }} />} onClick={() => rcLogoInputRef.current?.click()} disabled={!!uploadingRcAsset} sx={{ fontSize: 11, fontWeight: 700, textTransform: "none", py: 0.5 }}>
+                                                            {uploadingRcAsset === "logo" ? "Uploading..." : "Replace Logo"}
                                                         </Button>
                                                     </Box>
                                                 </Grid>
 
-                                                {/* Signature */}
-                                                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                                                    <Box sx={{ p: 1.5, borderRadius: 2, border: '1px dashed #cbd5e1', textAlign: 'center', bgcolor: '#f8fafc', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                                        <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}>
-                                                            Signature
+                                                {/* 2. Official Stamp & Signature (Single Unified Upload) */}
+                                                <Grid size={{ xs: 12, sm: 12, md: 4 }}>
+                                                    <Box sx={{ p: 2, borderRadius: 2, border: "1px dashed #cbd5e1", textAlign: "center", bgcolor: "#f8fafc", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                                                        <Typography variant="caption" sx={{ fontWeight: 700, display: "block", mb: 0.5, color: "#1e293b" }}>
+                                                            Official Stamp & Signature
                                                         </Typography>
-                                                        <Box sx={{ height: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1, bgcolor: '#fff', borderRadius: 1 }}>
-                                                            <Box component="img" src={rcSignatureUrl || '/signature.png'} alt="Signature" sx={{ maxHeight: 60, maxWidth: '100%', objectFit: 'contain' }} onError={(e: any) => { e.target.src = '/signature.png'; }} />
+                                                        <Box sx={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", mb: 1.5, bgcolor: "#fff", borderRadius: 1.5, p: 1, border: "1px solid #e2e8f0" }}>
+                                                            <Box component="img" src={rcSignatureUrl || rcStampUrl || "/signature.png"} alt="Stamp & Signature" sx={{ maxHeight: 70, maxWidth: "100%", objectFit: "contain" }} onError={(e: any) => { e.target.src = "/signature.png"; }} />
                                                         </Box>
-                                                        <input type="file" ref={rcSigInputRef} accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRemoteUpload(f, 'signature'); }} />
-                                                        <Button size="small" variant="outlined" startIcon={uploadingRcAsset === 'signature' ? <CircularProgress size={12} /> : <CloudUploadIcon sx={{ fontSize: 13 }} />} onClick={() => rcSigInputRef.current?.click()} disabled={!!uploadingRcAsset} sx={{ fontSize: 10, textTransform: 'none', py: 0.2 }}>
-                                                            {uploadingRcAsset === 'signature' ? 'Uploading...' : 'Replace'}
+                                                        <input type="file" ref={rcSigInputRef} accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRemoteUpload(f, "signature"); }} />
+                                                        <Button size="small" variant="outlined" color="primary" startIcon={uploadingRcAsset === "signature" ? <CircularProgress size={14} /> : <CloudUploadIcon sx={{ fontSize: 14 }} />} onClick={() => rcSigInputRef.current?.click()} disabled={!!uploadingRcAsset} sx={{ fontSize: 11, fontWeight: 700, textTransform: "none", py: 0.5 }}>
+                                                            {uploadingRcAsset === "signature" ? "Uploading..." : "Replace Stamp & Sig"}
                                                         </Button>
                                                     </Box>
                                                 </Grid>
 
-                                                {/* Stamp */}
-                                                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                                                    <Box sx={{ p: 1.5, borderRadius: 2, border: '1px dashed #cbd5e1', textAlign: 'center', bgcolor: '#f8fafc', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                                        <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}>
-                                                            Stamp Seal
+                                                {/* 3. Payment Barcode / QR */}
+                                                <Grid size={{ xs: 12, sm: 12, md: 4 }}>
+                                                    <Box sx={{ p: 2, borderRadius: 2, border: "1px dashed #cbd5e1", textAlign: "center", bgcolor: "#f8fafc", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                                                        <Typography variant="caption" sx={{ fontWeight: 700, display: "block", mb: 0.5, color: "#1e293b" }}>
+                                                            Payment Barcode / QR
                                                         </Typography>
-                                                        <Box sx={{ height: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1, bgcolor: '#fff', borderRadius: 1 }}>
-                                                            <Box component="img" src={rcStampUrl || '/stamp.png'} alt="Stamp" sx={{ maxHeight: 60, maxWidth: '100%', objectFit: 'contain' }} onError={(e: any) => { e.target.src = '/stamp.png'; }} />
-                                                        </Box>
-                                                        <input type="file" ref={rcStampInputRef} accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRemoteUpload(f, 'stamp'); }} />
-                                                        <Button size="small" variant="outlined" startIcon={uploadingRcAsset === 'stamp' ? <CircularProgress size={12} /> : <CloudUploadIcon sx={{ fontSize: 13 }} />} onClick={() => rcStampInputRef.current?.click()} disabled={!!uploadingRcAsset} sx={{ fontSize: 10, textTransform: 'none', py: 0.2 }}>
-                                                            {uploadingRcAsset === 'stamp' ? 'Uploading...' : 'Replace'}
-                                                        </Button>
-                                                    </Box>
-                                                </Grid>
-
-                                                {/* Payment Barcode / QR */}
-                                                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                                                    <Box sx={{ p: 1.5, borderRadius: 2, border: '1px dashed #cbd5e1', textAlign: 'center', bgcolor: '#f8fafc', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                                        <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}>
-                                                            Payment Barcode
-                                                        </Typography>
-                                                        <Box sx={{ height: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1, bgcolor: '#fff', borderRadius: 1 }}>
+                                                        <Box sx={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", mb: 1.5, bgcolor: "#fff", borderRadius: 1.5, p: 1, border: "1px solid #e2e8f0" }}>
                                                             {rcQrCodeUrl ? (
-                                                                <Box component="img" src={rcQrCodeUrl} alt="QR" sx={{ maxHeight: 60, maxWidth: '100%', objectFit: 'contain' }} />
+                                                                <Box component="img" src={rcQrCodeUrl} alt="QR" sx={{ maxHeight: 70, maxWidth: "100%", objectFit: "contain" }} />
                                                             ) : (
-                                                                <Typography variant="caption" sx={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 10 }}>
-                                                                    No Barcode
+                                                                <Typography variant="caption" sx={{ color: "#94a3b8", fontStyle: "italic", fontSize: 11 }}>
+                                                                    No Barcode Uploaded
                                                                 </Typography>
                                                             )}
                                                         </Box>
-                                                        <input type="file" ref={rcQrInputRef} accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRemoteUpload(f, 'qr'); }} />
-                                                        <Button size="small" variant="outlined" color="secondary" startIcon={uploadingRcAsset === 'qr' ? <CircularProgress size={12} /> : <CloudUploadIcon sx={{ fontSize: 13 }} />} onClick={() => rcQrInputRef.current?.click()} disabled={!!uploadingRcAsset} sx={{ fontSize: 10, textTransform: 'none', py: 0.2 }}>
-                                                            {uploadingRcAsset === 'qr' ? 'Uploading...' : 'Upload QR'}
+                                                        <input type="file" ref={rcQrInputRef} accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRemoteUpload(f, "qr"); }} />
+                                                        <Button size="small" variant="outlined" color="secondary" startIcon={uploadingRcAsset === "qr" ? <CircularProgress size={14} /> : <CloudUploadIcon sx={{ fontSize: 14 }} />} onClick={() => rcQrInputRef.current?.click()} disabled={!!uploadingRcAsset} sx={{ fontSize: 11, fontWeight: 700, textTransform: "none", py: 0.5 }}>
+                                                            {uploadingRcAsset === "qr" ? "Uploading..." : "Upload / Replace QR"}
                                                         </Button>
                                                     </Box>
                                                 </Grid>
@@ -1356,7 +1341,25 @@ export default function AdminVendorsPage() {
                     </DialogTitle>
                     <DialogContent dividers>
                         {errorMsg && (
-                            <Alert severity="error" sx={{ mb: 2 }}>{errorMsg}</Alert>
+                            <Alert
+                                severity="error"
+                                sx={{ mb: 2 }}
+                                action={
+                                    (errorMsg.toLowerCase().includes('session') || errorMsg.toLowerCase().includes('sign in') || errorMsg.toLowerCase().includes('authentication')) ? (
+                                        <Button
+                                            color="inherit"
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={() => router.push('/login?redirect=/admin/vendors')}
+                                            sx={{ textTransform: 'none', fontWeight: 700, fontSize: 11 }}
+                                        >
+                                            Sign In Again
+                                        </Button>
+                                    ) : undefined
+                                }
+                            >
+                                {errorMsg}
+                            </Alert>
                         )}
 
                         <Grid container spacing={2} sx={{ mt: 0.5 }}>

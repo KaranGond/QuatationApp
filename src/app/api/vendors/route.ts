@@ -180,6 +180,32 @@ export async function POST(request: Request) {
 
             if (authError) {
                 console.warn('Auth user creation warning:', authError.message);
+                if (authError.message?.toLowerCase().includes('already') || authError.message?.toLowerCase().includes('exists')) {
+                    try {
+                        const { data: userList } = await supabase.auth.admin.listUsers();
+                        const existingUser = userList?.users?.find((u: any) => u.email?.toLowerCase() === email.trim().toLowerCase());
+                        if (existingUser) {
+                            await supabase.auth.admin.updateUserById(existingUser.id, {
+                                password: password,
+                                user_metadata: {
+                                    vendor_id: newVendor.id,
+                                    vendor_name: newVendor.name,
+                                    role: role,
+                                }
+                            });
+                            createdAuthUser = existingUser;
+                            await supabase.from('vendor_users').upsert([{
+                                id: existingUser.id,
+                                vendor_id: newVendor.id,
+                                role: role,
+                                full_name: authorized_signatory || name,
+                                email: email.trim(),
+                            }]);
+                        }
+                    } catch (linkErr) {
+                        console.warn('Could not link existing auth user:', linkErr);
+                    }
+                }
             } else if (authData?.user) {
                 createdAuthUser = authData.user;
                 // Insert into vendor_users

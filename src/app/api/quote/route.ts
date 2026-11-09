@@ -71,8 +71,25 @@ export async function POST(request: Request) {
     const upiPn = encodeURIComponent(quoteData.companyDetails?.name || 'Solar Quotation');
     const upiLink = upiPa ? `upi://pay?pa=${upiPa}&pn=${upiPn}&am=${grandTotal}&cu=INR` : '';
 
+    // Query vendor's database profile to guarantee latest assets
+    const targetVendorId = quoteData.companyDetails?.id || (!session.isSuperAdmin ? session.vendor_id : null);
+    let dbVendor: any = null;
+    if (targetVendorId) {
+      try {
+        const supabase = getServerSupabase();
+        const { data: vData } = await supabase
+          .from('vendors')
+          .select('id, name, logo_url, signature_url, stamp_url, qr_code_url, upi_id')
+          .eq('id', targetVendorId)
+          .maybeSingle();
+        if (vData) dbVendor = vData;
+      } catch (err) {
+        console.warn('Could not query vendor profile for PDF assets:', err);
+      }
+    }
+
     // Load Payment QR Code (custom vendor QR or fallback to static payment.png)
-    let qrCodeUrl = quoteData.companyDetails?.qr_code_url || '';
+    let qrCodeUrl = quoteData.companyDetails?.qr_code_url || dbVendor?.qr_code_url || '';
     if (!qrCodeUrl) {
       try {
         const qrPath = path.join(process.cwd(), 'public', 'payment.png');
@@ -83,13 +100,20 @@ export async function POST(request: Request) {
       }
     }
 
-    let signatureUrl = '';
-    try {
-      const sigPath = path.join(process.cwd(), 'public', 'signature.png');
-      const sigBuffer = await fs.readFile(sigPath);
-      signatureUrl = `data:image/png;base64,${sigBuffer.toString('base64')}`;
-    } catch (sigError) {
-      console.warn('Signature image not found', sigError);
+    // Load Stamp & Signature (custom vendor merged image or fallback to signature.png)
+    let signatureUrl = quoteData.companyDetails?.signature_url || 
+                       quoteData.companyDetails?.signature || 
+                       dbVendor?.signature_url || 
+                       dbVendor?.stamp_url || '';
+
+    if (!signatureUrl || signatureUrl === '/signature.png') {
+      try {
+        const sigPath = path.join(process.cwd(), 'public', 'signature.png');
+        const sigBuffer = await fs.readFile(sigPath);
+        signatureUrl = `data:image/png;base64,${sigBuffer.toString('base64')}`;
+      } catch (sigError) {
+        console.warn('Signature image not found', sigError);
+      }
     }
 
     const sysType = (quoteData.selectedProduct?.systemType || quoteData.systemType || 'On-grid') as keyof typeof defaultComponents;
@@ -145,7 +169,7 @@ export async function POST(request: Request) {
     let pdfBuffer: Buffer | Uint8Array;
     try {
       const page = await browser.newPage();
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      await page.setContent(htmlContent, { waitUntil: ['domcontentloaded', 'networkidle2'], timeout: 15000 });
       await page.emulateMediaType('screen');
       pdfBuffer = await page.pdf({
         format: 'A4',
@@ -180,12 +204,6 @@ export async function POST(request: Request) {
 
     const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(fileName);
 
-    // Wait for Supabase storage propagation before generating URLs
-    await new Promise(r => setTimeout(r, 2000));
-
-    // Always use a signed URL for WhatsApp delivery.
-    // Public URLs can have CDN propagation delays causing DoubleTick to fail
-    // when it tries to download the PDF asynchronously.
     let pdfUrlForWhatsApp = urlData.publicUrl;
     try {
       const { data: signed, error: signError } = await supabase.storage
@@ -194,26 +212,9 @@ export async function POST(request: Request) {
       if (signed?.signedUrl && !signError) {
         pdfUrlForWhatsApp = signed.signedUrl;
         console.log('Using signed URL for WhatsApp delivery');
-      } else {
-        console.warn('Signed URL failed, falling back to public URL:', signError?.message);
       }
     } catch (signErr) {
       console.warn('Signed URL generation error, using public URL:', signErr);
-    }
-
-    // Verify the URL is accessible before sending to WhatsApp
-    try {
-      const verifyRes = await fetch(pdfUrlForWhatsApp, { method: 'HEAD' });
-      if (!verifyRes.ok) {
-        console.warn(`PDF URL verification failed (${verifyRes.status}), retrying...`);
-        await new Promise(r => setTimeout(r, 3000));
-        const retryRes = await fetch(pdfUrlForWhatsApp, { method: 'HEAD' });
-        if (!retryRes.ok) {
-          console.error(`PDF URL still not accessible after retry: ${retryRes.status}`);
-        }
-      }
-    } catch (verifyErr) {
-      console.warn('PDF URL verification error (may still work):', verifyErr);
     }
 
     if (!quoteData.skipWhatsApp) {

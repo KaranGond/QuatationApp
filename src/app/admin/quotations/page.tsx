@@ -117,6 +117,10 @@ export default function QuotationsAdminPage() {
         }
 
         const vendorObj = vendors.find(v => v.id === q.vendor_id) || authVendor;
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const brandedPdfUrl = (q.quote_number || q.id)
+            ? `${origin}/api/quote/view/${encodeURIComponent(q.quote_number || q.id)}`
+            : (q.pdf_url || null);
 
         const message = buildQuoteWhatsAppMessage({
             customerName: q.customer_name,
@@ -126,7 +130,7 @@ export default function QuotationsAdminPage() {
             systemCapacityKw: q.capacity_kw,
             systemType: q.system_type_name || 'Solar Power Plant',
             totalAmount: q.total_amount || 0,
-            pdfUrl: q.pdf_url || null,
+            pdfUrl: brandedPdfUrl || q.pdf_url || null,
             vendorName: vendorObj?.name || 'Karan Solar Shop',
             vendorSignatory: vendorObj?.authorized_signatory || 'Authorized Signatory',
             vendorPhone: vendorObj?.phone || '',

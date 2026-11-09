@@ -345,9 +345,9 @@ export const generateQuoteHtml = (data: any): string => {
       </div>
       <div class="sig-box right">
         <div class="for-company">For ${companyName}</div>
-        ${data.signatureUrl ? `<img src="${data.signatureUrl}" style="height: 60px; object-fit: contain; margin-bottom: -10px; display: block; margin-left: auto;" alt="Signature" />` : '<div style="height: 50px;"></div>'}
+        ${data.signatureUrl ? `<img src="${data.signatureUrl}" style="max-height: 70px; max-width: 190px; object-fit: contain; margin-bottom: -5px; display: block; margin-left: auto;" alt="Official Stamp & Signature" />` : '<div style="height: 50px;"></div>'}
         <div class="sig-line"></div>
-        <div class="sig-label">Authorized Signatory</div>
+        <div class="sig-label">Authorized Stamp & Signature</div>
       </div>
     </div>
   </div>
