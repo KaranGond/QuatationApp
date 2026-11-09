@@ -13,7 +13,7 @@ function escapeHtml(str: any): string {
 }
 
 export const generateQuoteHtml = (data: any): string => {
-  const { customerInfo, selectedProduct, calculations, components = [], terms = [], logoUrl, qrCodeUrl, upiLink } = data;
+  const { customerInfo, selectedProduct, calculations, components = [], terms = [], logoUrl, signatureUrl, qrCodeUrl, upiLink } = data;
   const company = data.companyDetails || defaultCompanyDetails;
 
   // Safe number extraction
@@ -345,7 +345,7 @@ export const generateQuoteHtml = (data: any): string => {
       </div>
       <div class="sig-box right">
         <div class="for-company">For ${companyName}</div>
-        ${data.signatureUrl ? `<img src="${data.signatureUrl}" style="max-height: 70px; max-width: 190px; object-fit: contain; margin-bottom: -5px; display: block; margin-left: auto;" alt="Official Stamp & Signature" />` : '<div style="height: 50px;"></div>'}
+        ${signatureUrl ? `<img src="${signatureUrl}" style="max-height: 70px; max-width: 190px; object-fit: contain; margin-bottom: -5px; display: block; margin-left: auto;" alt="Official Stamp & Signature" />` : '<div style="height: 50px;"></div>'}
         <div class="sig-line"></div>
         <div class="sig-label">Authorized Stamp & Signature</div>
       </div>

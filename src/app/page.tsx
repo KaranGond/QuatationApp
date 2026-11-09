@@ -162,18 +162,26 @@ function QuotationBuilder() {
 
   const [selectedCompanyId, setSelectedCompanyId] = useState(companies[0].id);
 
-  // Effective ID guaranteed to match the exact options rendered in the Select dropdown
+  // Effective ID guaranteed to match the exact vendor for the logged-in user
   const effectiveCompanyId = useMemo(() => {
+    // 1. Regular vendors are strictly locked to their own assigned company
+    if (role !== 'super_admin' && vendor?.id) {
+      return vendor.id;
+    }
+
+    // 2. Super admins can choose or simulate any vendor from the list
     if (allVendors && allVendors.length > 0) {
       const resolved = resolveVendorId(selectedCompanyId, allVendors);
       if (resolved) return resolved;
       if (vendor?.id && allVendors.some(v => v.id === vendor.id)) return vendor.id;
       return allVendors[0].id;
     }
+
     // Fallback before allVendors loads
+    if (vendor?.id) return vendor.id;
     if (companies.some(c => c.id === selectedCompanyId)) return selectedCompanyId;
     return companies[0]?.id || '';
-  }, [allVendors, selectedCompanyId, vendor, resolveVendorId]);
+  }, [role, vendor, allVendors, selectedCompanyId, resolveVendorId]);
 
   // Keep selectedCompanyId in sync with effectiveCompanyId
   useEffect(() => {
@@ -184,16 +192,24 @@ function QuotationBuilder() {
 
   // Sync selectedCompanyId when vendor context changes
   useEffect(() => {
-    if (vendor?.id && vendor.id !== selectedCompanyId) {
+    if (vendor?.id && (role !== 'super_admin' || !selectedCompanyId || selectedCompanyId === companies[0].id)) {
       setSelectedCompanyId(vendor.id);
     }
-  }, [vendor, selectedCompanyId]);
+  }, [vendor, role, selectedCompanyId]);
 
   const activeCompany = useMemo(() => {
-    const targetId = effectiveCompanyId || selectedCompanyId;
-    // Check if matching a loaded vendor
-    const foundVendor = allVendors.find(v => v.id === targetId) || (vendor && vendor.id === targetId ? vendor : null);
+    const targetId = (role !== 'super_admin' && vendor?.id)
+      ? vendor.id
+      : (effectiveCompanyId || selectedCompanyId);
+
+    // Prefer the active vendor from AuthContext if ID matches, else find in allVendors
+    const foundVendor = (vendor && vendor.id === targetId ? vendor : null) || 
+                        allVendors.find(v => v.id === targetId);
+
     if (foundVendor) {
+      const vLogo = foundVendor.logo_url || "/logo.png";
+      const vSig = foundVendor.signature_url || foundVendor.stamp_url || "/signature.png";
+      const vStamp = foundVendor.stamp_url || foundVendor.signature_url || null;
       return {
         id: foundVendor.id,
         name: foundVendor.name,
@@ -212,17 +228,21 @@ function QuotationBuilder() {
           ifsc: foundVendor.ifsc || "",
           upiId: foundVendor.upi_id || "",
         },
-        logo: foundVendor.logo_url || "/logo.png",
-        signature: foundVendor.signature_url || foundVendor.stamp_url || "/signature.png",
-        stamp: foundVendor.stamp_url || foundVendor.signature_url || null,
+        logo: vLogo,
+        logo_url: vLogo,
+        signature: vSig,
+        signature_url: vSig,
+        stamp: vStamp,
+        stamp_url: vStamp,
         qr_code_url: foundVendor.qr_code_url || null,
         authorizedSignatory: foundVendor.authorized_signatory || "Authorized Signatory",
+        authorized_signatory: foundVendor.authorized_signatory || "Authorized Signatory",
         defaultMargin: foundVendor.default_margin || 0,
         componentsSettings: foundVendor.components_settings || {},
       };
     }
     return companies.find(c => c.id === targetId || (targetId === 'arpit' && c.id === 'a0000000-0000-0000-0000-000000000001')) || companies[0];
-  }, [effectiveCompanyId, selectedCompanyId, allVendors, vendor]);
+  }, [role, vendor, effectiveCompanyId, selectedCompanyId, allVendors]);
 
   // Sync vendor component defaults when vendor/company changes
   useEffect(() => {
@@ -1021,6 +1041,7 @@ function QuotationBuilder() {
         })),
         terms: b2bTerms,
         companyDetails: activeCompany,
+        vendor_id: activeCompany.id,
         skipWhatsApp: options?.skipWhatsApp ?? true,
       };
     }
@@ -1060,6 +1081,7 @@ function QuotationBuilder() {
       components,
       terms,
       companyDetails: activeCompany,
+      vendor_id: activeCompany.id,
       skipWhatsApp: options?.skipWhatsApp ?? true,
     };
   };
@@ -2438,11 +2460,14 @@ function QuotationBuilder() {
                 <Typography sx={{ fontSize: "10.5px", fontWeight: 900, color: "#b45309", mb: 0, textDecoration: "underline", textDecorationColor: "#d97706", textUnderlineOffset: 3 }}>
                   For {activeCompany.name}
                 </Typography>
-                <Box sx={{ position: "relative", minHeight: 52, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-                  {(activeCompany as any).stamp && (activeCompany as any).signature !== '/signature.png' && (
-                    <Box component="img" src={resolveMediaUrl((activeCompany as any).stamp)} alt="Stamp" sx={{ width: 68, height: 68, objectFit: "contain", position: "absolute", right: 36, top: -10, opacity: 0.85, pointerEvents: "none" }} onError={(e: any) => e.target.style.display = 'none'} />
-                  )}
-                  <Box component="img" src={resolveMediaUrl((activeCompany as any).signature || '/signature.png')} alt="Signature" sx={{ width: 155, height: 55, objectFit: "contain", display: "block", ml: "auto", my: 0.2, position: "relative", zIndex: 1 }} onError={(e: any) => e.target.style.display = 'none'} />
+                <Box sx={{ minHeight: 52, display: "flex", alignItems: "center", justifyContent: "flex-end", my: 0.2 }}>
+                  <Box 
+                    component="img" 
+                    src={resolveMediaUrl((activeCompany as any).signature || (activeCompany as any).stamp || '/signature.png')} 
+                    alt="Official Stamp & Signature" 
+                    sx={{ maxHeight: 56, maxWidth: 170, objectFit: "contain", display: "block", ml: "auto", mixBlendMode: "multiply" }} 
+                    onError={(e: any) => { if (!e.target.src.endsWith('/signature.png')) e.target.src = '/signature.png'; }} 
+                  />
                 </Box>
                 <Box sx={{ width: 140, height: 1, bgcolor: "#cbd5e1", mb: 0.2, ml: "auto" }} />
                 <Typography sx={{ fontSize: "7.5px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8 }}>Authorized Signatory</Typography>
@@ -2563,11 +2588,14 @@ function QuotationBuilder() {
               </Box>
               <Box sx={{ textAlign: "right" }}>
                 <Typography sx={{ fontSize: "12px", fontWeight: 900, color: "#0d47a1", mb: 0, textDecoration: "underline", textDecorationColor: "#0d47a1", textUnderlineOffset: 3 }}>For {activeCompany.name}</Typography>
-                <Box sx={{ position: "relative", minHeight: 65, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-                  {(activeCompany as any).stamp && (activeCompany as any).signature !== '/signature.png' && (
-                    <Box component="img" src={resolveMediaUrl((activeCompany as any).stamp)} alt="Stamp" sx={{ width: 75, height: 75, objectFit: "contain", position: "absolute", right: 50, top: -10, opacity: 0.85, pointerEvents: "none" }} onError={(e: any) => e.target.style.display = 'none'} />
-                  )}
-                  <Box component="img" src={resolveMediaUrl((activeCompany as any).signature || '/signature.png')} alt="Signature" sx={{ width: 170, height: 65, objectFit: "contain", display: "block", ml: "auto", my: 0.2, position: "relative", zIndex: 1 }} onError={(e: any) => e.target.style.display = 'none'} />
+                <Box sx={{ minHeight: 60, display: "flex", alignItems: "center", justifyContent: "flex-end", my: 0.2 }}>
+                  <Box 
+                    component="img" 
+                    src={resolveMediaUrl((activeCompany as any).signature || (activeCompany as any).stamp || '/signature.png')} 
+                    alt="Official Stamp & Signature" 
+                    sx={{ maxHeight: 65, maxWidth: 180, objectFit: "contain", display: "block", ml: "auto", mixBlendMode: "multiply" }} 
+                    onError={(e: any) => { if (!e.target.src.endsWith('/signature.png')) e.target.src = '/signature.png'; }} 
+                  />
                 </Box>
                 <Box sx={{ width: 160, height: 1, bgcolor: "#cbd5e1", mb: 0.25, ml: "auto" }} />
                 <Typography sx={{ fontSize: "8px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8 }}>Authorized Signatory</Typography>
@@ -2698,7 +2726,7 @@ function QuotationBuilder() {
                           src={(activeCompany as any).qr_code_url || (origin ? `${origin}/payment.png` : "/payment.png")} 
                           alt="Payment QR" 
                           sx={{ width: 44, height: 44, objectFit: "contain", mixBlendMode: "multiply", display: "block" }} 
-                          onError={(e: any) => e.target.style.display = 'none'} 
+                          onError={(e: any) => { if (!e.target.src.endsWith('/signature.png')) e.target.src = '/signature.png'; }} 
                         />
                       </a>
                       <Typography sx={{ fontSize: "7px", color: "#64748b", mt: 0.1 }}>Scan UPI</Typography>
@@ -2789,7 +2817,7 @@ function QuotationBuilder() {
                     src={resolveMediaUrl((activeCompany as any).signature || (activeCompany as any).stamp || '/signature.png')} 
                     alt="Official Stamp & Signature" 
                     sx={{ maxHeight: 62, maxWidth: 180, objectFit: "contain", display: "block", ml: "auto", mixBlendMode: "multiply" }} 
-                    onError={(e: any) => e.target.style.display = 'none'} 
+                    onError={(e: any) => { if (!e.target.src.endsWith('/signature.png')) e.target.src = '/signature.png'; }} 
                   />
                 </Box>
                 <Box sx={{ width: 150, height: 1.5, bgcolor: "#0f172a", mb: 0.2, ml: "auto" }} />

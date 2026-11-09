@@ -11,6 +11,55 @@ import { getUserSession, unauthorizedResponse } from '@/lib/authGuard';
 
 export const runtime = 'nodejs';
 
+/**
+ * Resolves an image URL (remote HTTPS or local /public path) into an inlined base64 data URI.
+ * Inlining as base64 ensures Chromium / Puppeteer renders the image synchronously and reliably
+ * with zero network latency, zero CORS blocking, and zero broken image placeholders in generated PDFs.
+ */
+async function resolveImageAsBase64(imageUrl: string | null | undefined, fallbackPath?: string): Promise<string> {
+  if (!imageUrl && !fallbackPath) return '';
+  const url = (imageUrl && imageUrl.trim()) ? imageUrl.trim() : (fallbackPath || '');
+
+  // 1. If already a data URI, return directly
+  if (url.startsWith('data:image/')) {
+    return url;
+  }
+
+  // 2. Remote URL (http:// or https://)
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const arrayBuffer = await res.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const contentType = res.headers.get('content-type') || 'image/png';
+        return `data:${contentType};base64,${buffer.toString('base64')}`;
+      }
+    } catch (fetchErr) {
+      console.warn('[quote] Failed to fetch remote image:', url, fetchErr);
+    }
+  }
+
+  // 3. Local file in /public folder
+  const localFileName = url.startsWith('/') ? url.slice(1) : url;
+  try {
+    const filePath = path.join(process.cwd(), 'public', localFileName);
+    const buffer = await fs.readFile(filePath);
+    const ext = path.extname(localFileName).toLowerCase();
+    const mime = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.webp' ? 'image/webp' : 'image/png';
+    return `data:${mime};base64,${buffer.toString('base64')}`;
+  } catch {
+    if (fallbackPath && fallbackPath !== url) {
+      return resolveImageAsBase64(fallbackPath);
+    }
+  }
+
+  return url;
+}
+
 // Supabase client will be created lazily inside handlers after env validation
 
 export async function POST(request: Request) {
@@ -55,31 +104,18 @@ export async function POST(request: Request) {
     const discount = Math.max(0, n(calc.discount));
     const grandTotal = Math.max(0, +(total - discount).toFixed(2));
 
-    // Attach components list to the PDF payload
-    // Resolve absolute logo URL from public folder so Chromium can fetch it
-    const origin = process.env.APP_ORIGIN || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-    let logoUrl = `${origin}/logo.png`;
-    try {
-      const logoPath = path.join(process.cwd(), 'public', 'logo.png');
-      const logoBuffer = await fs.readFile(logoPath);
-      logoUrl = `data:image/png;base64,${logoBuffer.toString('base64')}`;
-    } catch (logoError) {
-      console.warn('Falling back to origin logo URL', logoError);
-    }
+    // Query vendor's database profile to guarantee latest assets & custom identity
+    const targetVendorId = (!session.isSuperAdmin && session.vendor_id)
+      ? session.vendor_id
+      : (quoteData.vendor_id || quoteData.companyDetails?.id || quoteData.companyDetails?.vendor_id);
 
-    const upiPa = quoteData.companyDetails?.bank?.upiId || quoteData.companyDetails?.upi_id || '';
-    const upiPn = encodeURIComponent(quoteData.companyDetails?.name || 'Solar Quotation');
-    const upiLink = upiPa ? `upi://pay?pa=${upiPa}&pn=${upiPn}&am=${grandTotal}&cu=INR` : '';
-
-    // Query vendor's database profile to guarantee latest assets
-    const targetVendorId = quoteData.companyDetails?.id || (!session.isSuperAdmin ? session.vendor_id : null);
     let dbVendor: any = null;
     if (targetVendorId) {
       try {
         const supabase = getServerSupabase();
         const { data: vData } = await supabase
           .from('vendors')
-          .select('id, name, logo_url, signature_url, stamp_url, qr_code_url, upi_id')
+          .select('*')
           .eq('id', targetVendorId)
           .maybeSingle();
         if (vData) dbVendor = vData;
@@ -88,33 +124,57 @@ export async function POST(request: Request) {
       }
     }
 
-    // Load Payment QR Code (custom vendor QR or fallback to static payment.png)
-    let qrCodeUrl = quoteData.companyDetails?.qr_code_url || dbVendor?.qr_code_url || '';
-    if (!qrCodeUrl) {
-      try {
-        const qrPath = path.join(process.cwd(), 'public', 'payment.png');
-        const qrBuffer = await fs.readFile(qrPath);
-        qrCodeUrl = `data:image/png;base64,${qrBuffer.toString('base64')}`;
-      } catch (qrError) {
-        console.warn('payment.png not found', qrError);
-      }
+    // Merge database vendor profile into companyDetails for complete fidelity
+    if (dbVendor) {
+      quoteData.companyDetails = {
+        id: dbVendor.id,
+        name: dbVendor.name,
+        tagline: dbVendor.tagline || quoteData.companyDetails?.tagline || '',
+        gstin: dbVendor.gstin || quoteData.companyDetails?.gstin || '',
+        headOffice: dbVendor.head_office || quoteData.companyDetails?.headOffice || '',
+        registeredOffice: dbVendor.registered_office || quoteData.companyDetails?.registeredOffice || '',
+        phone: dbVendor.phone || quoteData.companyDetails?.phone || '',
+        email: dbVendor.email || quoteData.companyDetails?.email || '',
+        bank: {
+          name: dbVendor.bank_name || quoteData.companyDetails?.bank?.name || 'HDFC Bank',
+          branch: dbVendor.bank_branch || quoteData.companyDetails?.bank?.branch || '',
+          accountName: dbVendor.account_name || quoteData.companyDetails?.bank?.accountName || dbVendor.name,
+          accountNumber: dbVendor.account_number || quoteData.companyDetails?.bank?.accountNumber || '',
+          ifsc: dbVendor.ifsc || quoteData.companyDetails?.bank?.ifsc || '',
+          upiId: dbVendor.upi_id || quoteData.companyDetails?.bank?.upiId || '',
+        },
+        logo: dbVendor.logo_url || quoteData.companyDetails?.logo,
+        logo_url: dbVendor.logo_url || quoteData.companyDetails?.logo_url,
+        signature: dbVendor.signature_url || dbVendor.stamp_url || quoteData.companyDetails?.signature,
+        signature_url: dbVendor.signature_url || dbVendor.stamp_url || quoteData.companyDetails?.signature_url,
+        stamp: dbVendor.stamp_url || dbVendor.signature_url || quoteData.companyDetails?.stamp,
+        stamp_url: dbVendor.stamp_url || dbVendor.signature_url || quoteData.companyDetails?.stamp_url,
+        qr_code_url: dbVendor.qr_code_url || quoteData.companyDetails?.qr_code_url,
+        authorizedSignatory: dbVendor.authorized_signatory || quoteData.companyDetails?.authorizedSignatory || 'Authorized Signatory',
+      };
     }
 
-    // Load Stamp & Signature (custom vendor merged image or fallback to signature.png)
-    let signatureUrl = quoteData.companyDetails?.signature_url || 
-                       quoteData.companyDetails?.signature || 
-                       dbVendor?.signature_url || 
-                       dbVendor?.stamp_url || '';
+    // Resolve Logo (Vendor's custom uploaded logo or fallback to /logo.png)
+    const rawLogo = dbVendor?.logo_url || quoteData.companyDetails?.logo_url || quoteData.companyDetails?.logo || '/logo.png';
+    const logoUrl = await resolveImageAsBase64(rawLogo, '/logo.png');
 
-    if (!signatureUrl || signatureUrl === '/signature.png') {
-      try {
-        const sigPath = path.join(process.cwd(), 'public', 'signature.png');
-        const sigBuffer = await fs.readFile(sigPath);
-        signatureUrl = `data:image/png;base64,${sigBuffer.toString('base64')}`;
-      } catch (sigError) {
-        console.warn('Signature image not found', sigError);
-      }
-    }
+    // Resolve Stamp & Signature (Vendor's custom merged upload or fallback to /signature.png)
+    const rawSig = dbVendor?.signature_url || 
+                   dbVendor?.stamp_url || 
+                   quoteData.companyDetails?.signature_url || 
+                   quoteData.companyDetails?.signature || 
+                   quoteData.companyDetails?.stamp_url || 
+                   quoteData.companyDetails?.stamp || 
+                   '/signature.png';
+    const signatureUrl = await resolveImageAsBase64(rawSig, '/signature.png');
+
+    // Resolve Payment QR Code (Vendor's custom uploaded QR or fallback to /payment.png)
+    const rawQr = dbVendor?.qr_code_url || quoteData.companyDetails?.qr_code_url || '/payment.png';
+    const qrCodeUrl = await resolveImageAsBase64(rawQr, '/payment.png');
+
+    const upiPa = quoteData.companyDetails?.bank?.upiId || quoteData.companyDetails?.upi_id || dbVendor?.upi_id || '';
+    const upiPn = encodeURIComponent(quoteData.companyDetails?.name || dbVendor?.name || 'Solar Quotation');
+    const upiLink = upiPa ? `upi://pay?pa=${upiPa}&pn=${upiPn}&am=${grandTotal}&cu=INR` : '';
 
     const sysType = (quoteData.selectedProduct?.systemType || quoteData.systemType || 'On-grid') as keyof typeof defaultComponents;
     const fallbackComps = defaultComponents[sysType] || defaultComponents['On-grid'];
@@ -180,10 +240,7 @@ export async function POST(request: Request) {
       try { await browser.close(); } catch { }
     }
 
-    const requestedVendorId = quoteData.vendor_id || quoteData.companyDetails?.id;
-    const vendorId = (!session.isSuperAdmin && session.vendor_id)
-      ? session.vendor_id
-      : (requestedVendorId || 'a0000000-0000-0000-0000-000000000001');
+    const vendorId = targetVendorId || quoteData.vendor_id || quoteData.companyDetails?.id || 'a0000000-0000-0000-0000-000000000001';
     const supabase = getServerSupabase();
     
     // Resolve tenant Node ID for sandboxed storage
