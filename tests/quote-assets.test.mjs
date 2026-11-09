@@ -97,3 +97,4 @@ describe('Quotation HTML Asset & Branding Fidelity', () => {
     assert.match(html, /Authorized Stamp & Signature/);
   });
 });
+
