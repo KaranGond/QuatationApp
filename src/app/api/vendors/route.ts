@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
 import { getUserSession, unauthorizedResponse, forbiddenResponse } from '@/lib/authGuard';
 import { generateNodeId, generateQuotePrefix } from '@/lib/multiTenant';
+import { companies } from '@/lib/companyDetails';
 
 // GET - List all vendors or get single vendor
 export async function GET(request: Request) {
@@ -48,7 +49,21 @@ export async function GET(request: Request) {
         return NextResponse.json({ success: true, data: data || [] });
     } catch (error: any) {
         console.error('Fetch vendors error:', error);
-        return NextResponse.json({ success: false, message: error.message || 'Failed to fetch vendors' }, { status: 500 });
+        // Fallback to default companies if DB is temporarily unreachable
+        const fallbackVendors = companies.map(c => ({
+            id: c.id,
+            name: c.name,
+            slug: c.slug,
+            node_id: 'NODE-VNS-001',
+            quote_prefix: 'KSS',
+            phone: c.phone,
+            email: c.email,
+            authorized_signatory: c.authorizedSignatory,
+            logo_url: c.logo,
+            status: 'active',
+            from_fallback: true
+        }));
+        return NextResponse.json({ success: true, data: fallbackVendors, fromFallback: true });
     }
 }
 
