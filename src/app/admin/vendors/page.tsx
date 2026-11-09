@@ -35,7 +35,8 @@ import {
     InputAdornment,
 } from '@mui/material';
 import AddBusinessIcon from '@mui/icons-material/AddBusiness';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -89,6 +90,7 @@ export default function AdminVendorsPage() {
     const [rcQrCodeUrl, setRcQrCodeUrl] = useState('');
     const [rcIsDemo, setRcIsDemo] = useState(false);
     const [rcPlanTier, setRcPlanTier] = useState('pro');
+    const [rcStatus, setRcStatus] = useState<'active' | 'suspended'>('active');
     const [rcTagline, setRcTagline] = useState('');
     const [rcPhone, setRcPhone] = useState('');
     const [rcAlternatePhone, setRcAlternatePhone] = useState('');
@@ -183,6 +185,7 @@ export default function AdminVendorsPage() {
         setRcQrCodeUrl(v.qr_code_url || '');
         setRcIsDemo(Boolean(v.is_demo));
         setRcPlanTier(v.plan_tier || 'pro');
+        setRcStatus((v.status as any) || 'active');
         setRcTagline(v.tagline || '');
         setRcPhone(v.phone || '');
         const existingUserEmail = v.vendor_users?.[0]?.email || v.email || '';
@@ -284,6 +287,7 @@ export default function AdminVendorsPage() {
                 quote_prefix: rcQuotePrefix.trim().toUpperCase(),
                 is_demo: rcIsDemo,
                 plan_tier: rcPlanTier,
+                status: rcStatus,
                 default_margin: remoteVendor?.default_margin ?? 0,
                 components_settings: remoteVendor?.components_settings ?? {},
             };
@@ -311,6 +315,7 @@ export default function AdminVendorsPage() {
 
             setRemoteSuccess(`Settings for "${rcName}" updated successfully! Changes are immediately live in their workspace.`);
             setRcResetPassword('');
+            if (json.data) setRemoteVendor(json.data);
 
             // Reload vendors in background
             const reloadRes = await apiFetch('/api/vendors');
@@ -513,16 +518,34 @@ export default function AdminVendorsPage() {
         }
     };
 
-    const handleDeactivate = async (id: string) => {
-        if (!confirm('Are you sure you want to deactivate this vendor?')) return;
+    const handleToggleStatus = async (v: any) => {
+        const isCurrentlySuspended = v.status === 'suspended';
+        const actionLabel = isCurrentlySuspended ? 'Resume / Activate' : 'Suspend';
+        const confirmMsg = isCurrentlySuspended
+            ? `Do you want to re-activate and resume vendor "${v.name}"? They will regain full access to generate quotations.`
+            : `Are you sure you want to suspend vendor "${v.name}"? Their workspace will be put on hold.`;
+
+        if (!confirm(confirmMsg)) return;
+
         try {
-            const res = await apiFetch(`/api/vendors?id=${id}`, { method: 'DELETE' });
+            const nextStatus = isCurrentlySuspended ? 'active' : 'suspended';
+            const res = await apiFetch(`/api/vendors?id=${v.id}&action=${isCurrentlySuspended ? 'resume' : 'suspend'}`, {
+                method: 'DELETE',
+            });
             const json = await res.json();
             if (json.success) {
+                if (remoteVendorId === v.id) {
+                    setRcStatus(nextStatus);
+                    setRemoteVendor((prev: any) => prev ? { ...prev, status: nextStatus } : prev);
+                }
+                setSuccessMsg(`Vendor "${v.name}" ${isCurrentlySuspended ? 'resumed and activated' : 'suspended'} successfully!`);
                 loadVendors();
+            } else {
+                setErrorMsg(json.message || `Failed to ${actionLabel.toLowerCase()} vendor`);
             }
-        } catch (err) {
-            console.error('Failed to deactivate vendor:', err);
+        } catch (err: any) {
+            console.error(`Failed to update vendor status:`, err);
+            setErrorMsg(err.message || 'Error updating vendor status');
         }
     };
 
@@ -724,9 +747,9 @@ export default function AdminVendorsPage() {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Chip
-                                                        label={v.status}
+                                                        label={v.status || 'active'}
                                                         size="small"
-                                                        color={v.status === 'active' ? 'success' : 'default'}
+                                                        color={v.status === 'suspended' ? 'error' : 'success'}
                                                         sx={{ fontWeight: 700, textTransform: 'capitalize' }}
                                                     />
                                                 </TableCell>
@@ -778,15 +801,45 @@ export default function AdminVendorsPage() {
                                                                 <VisibilityIcon fontSize="small" />
                                                             </IconButton>
                                                         </Tooltip>
-                                                        <Tooltip title="Deactivate">
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={() => handleDeactivate(v.id)}
-                                                                sx={{ color: '#ef4444', bgcolor: '#fef2f2', '&:hover': { bgcolor: '#fee2e2' } }}
-                                                            >
-                                                                <DeleteOutlineIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </Tooltip>
+                                                        {v.status === 'suspended' ? (
+                                                            <Tooltip title={`Resume / Re-activate ${v.name}`}>
+                                                                <Button
+                                                                    size="small"
+                                                                    variant="contained"
+                                                                    startIcon={<PlayCircleOutlineIcon sx={{ fontSize: 16 }} />}
+                                                                    onClick={() => handleToggleStatus(v)}
+                                                                    sx={{
+                                                                        textTransform: 'none',
+                                                                        fontWeight: 700,
+                                                                        fontSize: 11,
+                                                                        py: 0.35,
+                                                                        px: 1.2,
+                                                                        borderRadius: 1.5,
+                                                                        bgcolor: '#16a34a',
+                                                                        color: '#fff',
+                                                                        '&:hover': { bgcolor: '#15803d' },
+                                                                        boxShadow: '0 2px 6px rgba(22,163,74,0.3)',
+                                                                    }}
+                                                                >
+                                                                    Resume
+                                                                </Button>
+                                                            </Tooltip>
+                                                        ) : (
+                                                            <Tooltip title={`Suspend ${v.name}`}>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={() => handleToggleStatus(v)}
+                                                                    sx={{
+                                                                        color: '#ef4444',
+                                                                        bgcolor: '#fef2f2',
+                                                                        border: '1px solid #fee2e2',
+                                                                        '&:hover': { bgcolor: '#fee2e2' }
+                                                                    }}
+                                                                >
+                                                                    <PauseCircleOutlineIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
                                                     </Stack>
                                                 </TableCell>
                                             </TableRow>
@@ -908,7 +961,28 @@ export default function AdminVendorsPage() {
                                 <Typography color="text.secondary">No vendor selected.</Typography>
                             </Box>
                         ) : (
-                            <Grid container spacing={3}>
+                            <>
+                                {rcStatus === 'suspended' && (
+                                    <Alert
+                                        severity="error"
+                                        sx={{ mb: 3, borderRadius: 2, alignItems: 'center', bgcolor: '#fef2f2', border: '1px solid #fecaca' }}
+                                        action={
+                                            <Button
+                                                color="success"
+                                                size="small"
+                                                variant="contained"
+                                                startIcon={<PlayCircleOutlineIcon />}
+                                                onClick={() => handleToggleStatus(remoteVendor)}
+                                                sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}
+                                            >
+                                                Resume Vendor Workspace
+                                            </Button>
+                                        }
+                                    >
+                                        <strong>⚠️ This vendor is currently SUSPENDED.</strong> Their workspace and quotation creation are paused. Click to resume them.
+                                    </Alert>
+                                )}
+                                <Grid container spacing={3}>
                                 {/* Left Column: Components, Pricing & Credentials */}
                                 <Grid size={{ xs: 12, md: 6 }}>
                                     {/* 1. Customer Vendor Login Credentials */}
@@ -1174,7 +1248,22 @@ export default function AdminVendorsPage() {
                                                     <TextField fullWidth label="GSTIN Number" value={rcGstin} onChange={(e) => setRcGstin(e.target.value)} />
                                                 </Grid>
                                                 <Grid size={{ xs: 12, sm: 6 }}>
-                                                    <TextField fullWidth label="Status" value={remoteVendor.status || 'active'} disabled />
+                                                    <FormControl fullWidth>
+                                                        <InputLabel sx={{ fontWeight: 700 }}>Operating Status</InputLabel>
+                                                        <Select
+                                                            value={rcStatus}
+                                                            label="Operating Status"
+                                                            onChange={(e) => setRcStatus(e.target.value as 'active' | 'suspended')}
+                                                            sx={{ fontWeight: 700 }}
+                                                        >
+                                                            <MenuItem value="active" sx={{ color: '#16a34a', fontWeight: 700 }}>
+                                                                🟢 Active (Operational)
+                                                            </MenuItem>
+                                                            <MenuItem value="suspended" sx={{ color: '#dc2626', fontWeight: 700 }}>
+                                                                ⛔ Suspended (On Hold / Paused)
+                                                            </MenuItem>
+                                                        </Select>
+                                                    </FormControl>
                                                 </Grid>
                                                 <Grid size={{ xs: 12 }}>
                                                     <TextField fullWidth label="Head Office Address" value={rcHeadOffice} onChange={(e) => setRcHeadOffice(e.target.value)} />
@@ -1208,6 +1297,7 @@ export default function AdminVendorsPage() {
                                     </Box>
                                 </Grid>
                             </Grid>
+                            </>
                         )}
                     </Box>
 

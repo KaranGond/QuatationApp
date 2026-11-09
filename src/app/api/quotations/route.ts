@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
 import { gstConfig, calculateSavings, getSubsidyForCapacity } from '@/lib/companyDetails';
 import { getNextTenantQuoteNumber } from '@/lib/multiTenant';
-import { getUserSession, unauthorizedResponse } from '@/lib/authGuard';
+import { getUserSession, unauthorizedResponse, forbiddenResponse } from '@/lib/authGuard';
 
 // GET - List quotations with multi-tenant filtering
 export async function GET(request: Request) {
@@ -101,6 +101,9 @@ export async function POST(request: Request) {
             .single();
 
         if (vendorData) {
+            if (vendorData.status === 'suspended' && !session.isSuperAdmin) {
+                return forbiddenResponse('This vendor account is currently suspended. Please contact the administrator to resume your project.');
+            }
             vendorNodeId = vendorData.node_id || 'NODE-VNS-001';
             vendorSnapshot = {
                 name: vendorData.name,

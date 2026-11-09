@@ -377,33 +377,36 @@ export async function PUT(request: Request) {
     }
 }
 
-// DELETE - Deactivate/Delete vendor
+// DELETE - Deactivate/Suspend or Resume/Activate vendor
 export async function DELETE(request: Request) {
     const session = await getUserSession(request);
     if (!session) return unauthorizedResponse();
-    if (!session.isSuperAdmin) return forbiddenResponse('Only Super Administrators can deactivate vendors');
+    if (!session.isSuperAdmin) return forbiddenResponse('Only Super Administrators can modify vendor status');
 
     try {
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
+        const action = (searchParams.get('action') || 'suspend').toLowerCase();
 
         if (!id) {
             return NextResponse.json({ success: false, message: 'Vendor ID is required' }, { status: 400 });
         }
 
         const supabase = getServerSupabase();
+        const targetStatus = (action === 'resume' || action === 'activate') ? 'active' : 'suspended';
 
-        // Soft delete (set status to suspended)
+        // Update vendor status
         const { error } = await supabase
             .from('vendors')
-            .update({ status: 'suspended', updated_at: new Date().toISOString() })
+            .update({ status: targetStatus, updated_at: new Date().toISOString() })
             .eq('id', id);
 
         if (error) throw error;
 
-        return NextResponse.json({ success: true, message: 'Vendor deactivated successfully' });
+        const actionText = targetStatus === 'active' ? 'resumed and activated' : 'suspended';
+        return NextResponse.json({ success: true, message: `Vendor ${actionText} successfully` });
     } catch (error: any) {
-        console.error('Delete vendor error:', error);
-        return NextResponse.json({ success: false, message: error.message || 'Failed to deactivate vendor' }, { status: 500 });
+        console.error('Update vendor status error:', error);
+        return NextResponse.json({ success: false, message: error.message || 'Failed to update vendor status' }, { status: 500 });
     }
 }

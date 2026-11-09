@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { generateAndUploadQuotePdf } from '@/lib/pdfGenerator';
 import { sendWhatsAppMessage } from '../../../lib/whatsapp';
 import { getUserSession, unauthorizedResponse } from '@/lib/authGuard';
+import { getServerSupabase } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
 
@@ -25,6 +26,19 @@ export async function POST(request: Request) {
     // Enforce tenant vendor_id for non-super_admins
     if (!session.isSuperAdmin && session.vendor_id) {
       quoteData.vendor_id = session.vendor_id;
+    }
+
+    // Verify vendor is active and not suspended
+    const targetVendorId = quoteData.vendor_id || session.vendor_id;
+    if (targetVendorId && !session.isSuperAdmin) {
+      const supabase = getServerSupabase();
+      const { data: v } = await supabase.from('vendors').select('status').eq('id', targetVendorId).maybeSingle();
+      if (v?.status === 'suspended') {
+        return NextResponse.json({
+          success: false,
+          message: 'This vendor account is currently suspended. Please contact the administrator to resume your project.',
+        }, { status: 403 });
+      }
     }
 
     const { publicUrl, storagePath, totals } = await generateAndUploadQuotePdf(quoteData);
