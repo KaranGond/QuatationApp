@@ -96,5 +96,29 @@ describe('Quotation HTML Asset & Branding Fidelity', () => {
     assert.ok(html.length > 500, 'HTML must be generated even when images are empty');
     assert.match(html, /Authorized Stamp & Signature/);
   });
+
+  it('generates complete self-contained CSS styles for single-page visual fidelity', () => {
+    const html = generateQuoteHtml({
+      ...baseMockData,
+      quoteNumber: 'RSS/2026/003',
+      currentDate: '10 Nov 2026'
+    });
+
+    // Verify key style classes are present in the <style> block
+    const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+    assert.ok(styleMatch, 'HTML must contain a <style> block');
+    const css = styleMatch[1];
+
+    assert.ok(css.includes('.header'), 'CSS must style .header flexbox');
+    assert.ok(css.includes('.logo'), 'CSS must constrain .logo dimensions');
+    assert.ok(css.includes('.quote-badge'), 'CSS must style the .quote-badge');
+    assert.ok(css.includes('.grid-2'), 'CSS must define the 2-column layout .grid-2');
+    assert.ok(css.includes('.info-box'), 'CSS must define .info-box card container');
+    assert.ok(css.includes('table'), 'CSS must define table border-collapse and styles');
+    assert.ok(css.includes('.subsidy-box'), 'CSS must style .subsidy-box');
+    assert.ok(css.includes('.bank-box'), 'CSS must style .bank-box');
+    assert.ok(css.includes('.investment-box'), 'CSS must style .investment-box');
+    assert.ok(css.includes('.signature-section'), 'CSS must style .signature-section');
+  });
 });
 

@@ -222,12 +222,17 @@ export async function GET(request: Request, context: RouteContext) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quotation ${quoteNumber} - ${quote.customer_name || 'Customer'}</title>
   <style>
+    /* 1. Template CSS Styles (Ensures 100% fidelity with PDF design) */
+    ${extractStyle(htmlContent)}
+
+    /* 2. Viewer Wrapper & Navigation Overrides */
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 0;
-      background: #0f172a;
-      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #0f172a !important;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+      min-height: 100vh;
     }
     .viewer-navbar {
       position: sticky;
@@ -314,12 +319,20 @@ export async function GET(request: Request, context: RouteContext) {
     }
     .viewer-sheet-frame {
       background: #ffffff;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-      border-radius: 3px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      border-radius: 4px;
       width: 100%;
-      max-width: 200mm;
-      padding: 10px 14px;
+      max-width: 210mm;
+      padding: 6mm 8mm;
       box-sizing: border-box;
+      color: #1e293b;
+      font-size: 9.5px;
+      line-height: 1.4;
+    }
+    .viewer-sheet-frame .page {
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
     @media (max-width: 640px) {
       .viewer-navbar {
@@ -333,10 +346,11 @@ export async function GET(request: Request, context: RouteContext) {
         padding: 6px 11px;
       }
       .viewer-content {
-        padding: 10px 4px 24px 4px;
+        padding: 8px 4px 24px 4px;
       }
       .viewer-sheet-frame {
-        padding: 6px 6px;
+        padding: 4mm 4mm;
+        border-radius: 0;
       }
     }
     @media print {
@@ -356,6 +370,7 @@ export async function GET(request: Request, context: RouteContext) {
         border-radius: 0 !important;
         max-width: 100% !important;
         padding: 0 !important;
+        width: 100% !important;
       }
     }
   </style>
@@ -405,6 +420,12 @@ export async function GET(request: Request, context: RouteContext) {
             headers: { 'Content-Type': 'text/plain; charset=utf-8' },
         });
     }
+}
+
+function extractStyle(fullHtml: string): string {
+    const matches = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
+    if (!matches) return '';
+    return matches.map(tag => tag.replace(/<\/?style[^>]*>/gi, '')).join('\n');
 }
 
 function extractBody(fullHtml: string): string {
