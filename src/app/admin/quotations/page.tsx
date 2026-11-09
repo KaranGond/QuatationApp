@@ -131,9 +131,9 @@ export default function QuotationsAdminPage() {
             systemType: q.system_type_name || 'Solar Power Plant',
             totalAmount: q.total_amount || 0,
             pdfUrl: brandedPdfUrl || q.pdf_url || null,
-            vendorName: vendorObj?.name || 'Karan Solar Shop',
-            vendorSignatory: vendorObj?.authorized_signatory || 'Authorized Signatory',
-            vendorPhone: vendorObj?.phone || '',
+            vendorName: (q as any).vendor_snapshot?.name || vendorObj?.name || 'Solar Quotation',
+            vendorSignatory: (q as any).vendor_snapshot?.authorized_signatory || vendorObj?.authorized_signatory || 'Authorized Signatory',
+            vendorPhone: (q as any).vendor_snapshot?.phone || vendorObj?.phone || '',
         });
 
         openWhatsAppDirect(q.customer_phone, message);
@@ -471,18 +471,14 @@ export default function QuotationsAdminPage() {
                                                             <Edit fontSize="small" />
                                                         </IconButton>
                                                     </Tooltip>
-                                                    <Tooltip title={quotation.pdf_url ? "View PDF" : "PDF not yet generated (Click to open & generate)"}>
+                                                    <Tooltip title="View Official PDF">
                                                         <IconButton 
                                                             size="small" 
                                                             onClick={() => {
-                                                                if (quotation.pdf_url) {
-                                                                    window.open(quotation.pdf_url, '_blank');
-                                                                } else {
-                                                                    handleEdit(quotation);
-                                                                }
+                                                                window.open(`/api/quote/view/${encodeURIComponent(quotation.quote_number || quotation.id)}`, '_blank');
                                                             }}
                                                         >
-                                                            <Visibility fontSize="small" color={quotation.pdf_url ? "primary" : "action"} />
+                                                            <Visibility fontSize="small" color="primary" />
                                                         </IconButton>
                                                     </Tooltip>
                                                     <Tooltip title="Send via WhatsApp">

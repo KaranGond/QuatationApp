@@ -22,6 +22,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
 import { apiFetch } from '@/lib/apiFetch';
@@ -95,9 +96,9 @@ function VendorDashboardContent() {
             systemType: q.system_type_name || 'Solar Power Plant',
             totalAmount: q.total_amount || 0,
             pdfUrl: brandedPdfUrl || q.pdf_url || null,
-            vendorName: vendor?.name || 'Karan Solar Shop',
-            vendorSignatory: vendor?.authorized_signatory || 'Authorized Signatory',
-            vendorPhone: vendor?.phone || '',
+            vendorName: q.vendor_snapshot?.name || vendor?.name || 'Solar Quotation',
+            vendorSignatory: q.vendor_snapshot?.authorized_signatory || vendor?.authorized_signatory || 'Authorized Signatory',
+            vendorPhone: q.vendor_snapshot?.phone || vendor?.phone || '',
         });
 
         openWhatsAppDirect(q.customer_phone, message);
@@ -326,6 +327,16 @@ function VendorDashboardContent() {
                                                 color={q.status === 'WhatsApp Sent' || q.status === 'sent' ? 'success' : 'default'}
                                                 sx={{ textTransform: 'capitalize', fontWeight: 600 }}
                                             />
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                color="info"
+                                                onClick={() => window.open(`/api/quote/view/${encodeURIComponent(q.quote_number || q.id)}`, '_blank')}
+                                                startIcon={<PictureAsPdfIcon />}
+                                                sx={{ textTransform: 'none', fontWeight: 700 }}
+                                            >
+                                                View PDF
+                                            </Button>
                                             <Button
                                                 size="small"
                                                 variant="outlined"

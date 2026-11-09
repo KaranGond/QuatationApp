@@ -127,6 +127,7 @@ export async function PUT(request: Request, context: RouteContext) {
         };
 
         if (pdf_url !== undefined) updateData.pdf_url = pdf_url;
+        if (body.pdf_storage_path !== undefined) updateData.pdf_storage_path = body.pdf_storage_path;
         if (form_data !== undefined) updateData.form_data = form_data;
 
         const { data, error } = await supabase
