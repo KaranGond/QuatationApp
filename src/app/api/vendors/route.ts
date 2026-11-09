@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
         let query = supabase
             .from('vendors')
-            .select('*, quotations(count), vendor_users(id, email, role, full_name)')
+            .select('*, quotations:quotations!quotations_vendor_id_fkey(count), vendor_users(id, email, role, full_name)')
             .order('name', { ascending: true });
 
         if (activeOnly) {

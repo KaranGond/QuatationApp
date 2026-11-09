@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 // Use dynamic imports to support serverless-compatible Chromium in production
-import { createClient } from '@supabase/supabase-js';
+import { getServerSupabase } from '@/lib/supabase';
 import { sendWhatsAppMessage } from '../../../lib/whatsapp';
 import { generateQuoteHtml } from '../../../lib/quoteTemplate';
 import { defaultComponents } from '@/lib/companyDetails';
@@ -32,8 +32,10 @@ export async function POST(request: Request) {
 
     // Env validation
     const missingEnv: string[] = [];
-    if (!process.env.SUPABASE_URL) missingEnv.push('SUPABASE_URL');
-    if (!process.env.SUPABASE_KEY) missingEnv.push('SUPABASE_KEY');
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+    if (!supabaseUrl) missingEnv.push('SUPABASE_URL');
+    if (!supabaseKey) missingEnv.push('SUPABASE_KEY / SUPABASE_SERVICE_ROLE_KEY');
     if (!process.env.SUPABASE_BUCKET) missingEnv.push('SUPABASE_BUCKET');
     if (missingEnv.length) {
       return NextResponse.json({ message: `Missing environment variables: ${missingEnv.join(', ')}` }, { status: 500 });
@@ -158,7 +160,7 @@ export async function POST(request: Request) {
     const vendorId = (!session.isSuperAdmin && session.vendor_id)
       ? session.vendor_id
       : (requestedVendorId || 'a0000000-0000-0000-0000-000000000001');
-    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_KEY!);
+    const supabase = getServerSupabase();
     
     // Resolve tenant Node ID for sandboxed storage
     let nodeId = 'NODE-VNS-001';
@@ -229,8 +231,8 @@ export async function POST(request: Request) {
 export async function GET() {
   try {
     const missingEnv: string[] = [];
-    if (!process.env.SUPABASE_URL) missingEnv.push('SUPABASE_URL');
-    if (!process.env.SUPABASE_KEY) missingEnv.push('SUPABASE_KEY');
+    if (!process.env.SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL) missingEnv.push('SUPABASE_URL');
+    if (!process.env.SUPABASE_KEY && !process.env.SUPABASE_SERVICE_ROLE_KEY) missingEnv.push('SUPABASE_KEY');
     if (!process.env.SUPABASE_BUCKET) missingEnv.push('SUPABASE_BUCKET');
     if (!process.env.DOUBLETICK_API_KEY) missingEnv.push('DOUBLETICK_API_KEY');
     if (!process.env.DOUBLETICK_SENDER_PHONE) missingEnv.push('DOUBLETICK_SENDER_PHONE');

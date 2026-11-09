@@ -440,9 +440,18 @@ export default function QuotationsAdminPage() {
                                                             <Edit fontSize="small" />
                                                         </IconButton>
                                                     </Tooltip>
-                                                    <Tooltip title="View PDF">
-                                                        <IconButton size="small" onClick={() => quotation.pdf_url ? window.open(quotation.pdf_url, '_blank') : alert('PDF not available for this quotation.')}>
-                                                            <Visibility fontSize="small" color={quotation.pdf_url ? "primary" : "inherit"} />
+                                                    <Tooltip title={quotation.pdf_url ? "View PDF" : "PDF not yet generated (Click to open & generate)"}>
+                                                        <IconButton 
+                                                            size="small" 
+                                                            onClick={() => {
+                                                                if (quotation.pdf_url) {
+                                                                    window.open(quotation.pdf_url, '_blank');
+                                                                } else {
+                                                                    handleEdit(quotation);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Visibility fontSize="small" color={quotation.pdf_url ? "primary" : "action"} />
                                                         </IconButton>
                                                     </Tooltip>
                                                     <Tooltip title="Send via WhatsApp">
