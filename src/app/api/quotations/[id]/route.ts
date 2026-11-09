@@ -126,7 +126,10 @@ export async function PUT(request: Request, context: RouteContext) {
             updated_at: new Date().toISOString(),
         };
 
-        if (pdf_url !== undefined) updateData.pdf_url = pdf_url;
+        if (pdf_url !== undefined) {
+            updateData.pdf_url = pdf_url;
+            updateData.pdf_storage_path = body.pdf_storage_path ?? (pdf_url ? undefined : null);
+        }
         if (body.pdf_storage_path !== undefined) updateData.pdf_storage_path = body.pdf_storage_path;
         if (form_data !== undefined) updateData.form_data = form_data;
 

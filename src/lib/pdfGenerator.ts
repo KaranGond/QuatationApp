@@ -117,12 +117,14 @@ export async function prepareQuoteHtmlPayload(inputData: any): Promise<{ htmlCon
     
     // Sanitize demo assets for third-party vendors
     let rawLogo = rawVendor.logo_url || inputData.companyDetails?.logo_url || inputData.companyDetails?.logo;
-    let rawSig = rawVendor.signature_url || rawVendor.stamp_url || inputData.companyDetails?.signature_url || inputData.companyDetails?.signature;
+    let rawSig = rawVendor.signature_url || inputData.companyDetails?.signature_url || inputData.companyDetails?.signature;
+    let rawStamp = rawVendor.stamp_url || inputData.companyDetails?.stamp_url || inputData.companyDetails?.stamp;
     let rawQr = rawVendor.qr_code_url || inputData.companyDetails?.qr_code_url;
 
     if (!isDemoKaran) {
         if (rawLogo === '/logo.png') rawLogo = null;
         if (rawSig === '/signature.png' || rawSig === '/stamp.png') rawSig = null;
+        if (rawStamp === '/signature.png' || rawStamp === '/stamp.png') rawStamp = null;
         if (rawQr === '/payment.png') rawQr = null;
     }
 
@@ -146,6 +148,7 @@ export async function prepareQuoteHtmlPayload(inputData: any): Promise<{ htmlCon
         },
         logo_url: rawLogo,
         signature_url: rawSig,
+        stamp_url: rawStamp,
         qr_code_url: rawQr,
     };
 
@@ -177,6 +180,7 @@ export async function prepareQuoteHtmlPayload(inputData: any): Promise<{ htmlCon
     // 5. Resolve Branding Images as Base64 Data URIs
     const logoUrl = await resolveImageAsBase64(companyDetails.logo_url, isDemoKaran ? '/logo.png' : undefined);
     const signatureUrl = await resolveImageAsBase64(companyDetails.signature_url, isDemoKaran ? '/signature.png' : undefined);
+    const stampUrl = await resolveImageAsBase64(companyDetails.stamp_url, isDemoKaran ? '/stamp.png' : undefined);
     
     // Resolve Payment QR Code: Custom uploaded image -> dynamic UPI QR -> demo fallback
     let qrCodeUrl = await resolveImageAsBase64(companyDetails.qr_code_url, undefined);
@@ -242,6 +246,7 @@ export async function prepareQuoteHtmlPayload(inputData: any): Promise<{ htmlCon
         companyDetails,
         logoUrl,
         signatureUrl,
+        stampUrl,
         qrCodeUrl,
         upiLink,
         quoteNumber,
@@ -294,7 +299,8 @@ export async function renderHtmlToPdfBuffer(htmlContent: string): Promise<Buffer
         const pdfArrayBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,
-            margin: { top: '10mm', right: '10mm', bottom: '12mm', left: '10mm' }
+            preferCSSPageSize: true,
+            margin: { top: '6mm', right: '8mm', bottom: '6mm', left: '8mm' }
         });
         return Buffer.from(pdfArrayBuffer);
     } finally {

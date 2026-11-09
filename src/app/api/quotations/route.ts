@@ -7,16 +7,21 @@ import { getUserSession, unauthorizedResponse } from '@/lib/authGuard';
 // GET - List quotations with multi-tenant filtering
 export async function GET(request: Request) {
     try {
+        const session = await getUserSession(request);
+        if (!session) return unauthorizedResponse();
+
         const { searchParams } = new URL(request.url);
         const status = searchParams.get('status');
         const limit = parseInt(searchParams.get('limit') || '50', 10);
         let vendorId = searchParams.get('vendor_id');
 
-        const session = await getUserSession(request);
         const supabase = getServerSupabase();
 
-        // If authenticated as a vendor or salesperson, enforce their tenant_id
-        if (session && !session.isSuperAdmin && session.vendor_id) {
+        // Strict multi-tenant isolation: non-super_admins can ONLY list their own quotations
+        if (!session.isSuperAdmin) {
+            if (!session.vendor_id) {
+                return NextResponse.json({ success: true, data: [] });
+            }
             vendorId = session.vendor_id;
         }
 

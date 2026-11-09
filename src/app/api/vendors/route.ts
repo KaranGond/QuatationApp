@@ -12,12 +12,36 @@ export async function GET(request: Request) {
         const slug = searchParams.get('slug');
         const activeOnly = searchParams.get('active') === 'true';
 
+        const session = await getUserSession(request);
         const supabase = getServerSupabase();
+
+        // 1. Strict Tenant Isolation for regular vendors/salespersons
+        if (session && !session.isSuperAdmin && session.vendor_id) {
+            // Cannot inspect another vendor's profile by ID
+            if (id && id !== session.vendor_id) {
+                return forbiddenResponse('You can only access your own vendor profile');
+            }
+
+            const { data, error } = await supabase
+                .from('vendors')
+                .select('*')
+                .eq('id', session.vendor_id)
+                .single();
+
+            if (error) throw error;
+            return NextResponse.json({ success: true, data: id ? data : [data] });
+        }
+
+        // 2. Super Admin or Public (Unauthenticated) resolution
+        const isSuperAdmin = session?.isSuperAdmin;
+        const selectFields = isSuperAdmin
+            ? '*, quotations:quotations!quotations_vendor_id_fkey(count), vendor_users(id, email, role, full_name)'
+            : 'id, name, slug, tagline, quote_prefix, node_id, logo_url, phone, email, status';
 
         if (id) {
             const { data, error } = await supabase
                 .from('vendors')
-                .select('*, vendor_users(id, email, role, full_name)')
+                .select(selectFields)
                 .eq('id', id)
                 .single();
             if (error) throw error;
@@ -27,7 +51,7 @@ export async function GET(request: Request) {
         if (slug) {
             const { data, error } = await supabase
                 .from('vendors')
-                .select('*, vendor_users(id, email, role, full_name)')
+                .select(selectFields)
                 .eq('slug', slug)
                 .single();
             if (error) throw error;
@@ -36,7 +60,7 @@ export async function GET(request: Request) {
 
         let query = supabase
             .from('vendors')
-            .select('*, quotations:quotations!quotations_vendor_id_fkey(count), vendor_users(id, email, role, full_name)')
+            .select(selectFields)
             .order('name', { ascending: true });
 
         if (activeOnly) {

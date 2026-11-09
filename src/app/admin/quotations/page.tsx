@@ -119,7 +119,7 @@ export default function QuotationsAdminPage() {
         const vendorObj = vendors.find(v => v.id === q.vendor_id) || authVendor;
         const origin = typeof window !== 'undefined' ? window.location.origin : '';
         const brandedPdfUrl = (q.quote_number || q.id)
-            ? `${origin}/api/quote/view/${encodeURIComponent(q.quote_number || q.id)}`
+            ? `${origin}/api/quote/view/${encodeURIComponent(q.quote_number || q.id)}?v=${Date.now()}`
             : (q.pdf_url || null);
 
         const message = buildQuoteWhatsAppMessage({

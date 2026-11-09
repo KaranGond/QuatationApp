@@ -98,7 +98,13 @@ export async function POST(request: Request) {
             if (cleanType === 'logo') {
                 updatePayload.logo_url = publicUrl;
                 updatedColumn = 'logo_url';
-            } else if (cleanType === 'signature' || cleanType === 'stamp' || cleanType === 'stamp_signature') {
+            } else if (cleanType === 'signature') {
+                updatePayload.signature_url = publicUrl;
+                updatedColumn = 'signature_url';
+            } else if (cleanType === 'stamp') {
+                updatePayload.stamp_url = publicUrl;
+                updatedColumn = 'stamp_url';
+            } else if (cleanType === 'stamp_signature') {
                 updatePayload.signature_url = publicUrl;
                 updatePayload.stamp_url = publicUrl;
                 updatedColumn = 'signature_url';

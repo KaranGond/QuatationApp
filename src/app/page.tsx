@@ -138,6 +138,7 @@ function QuotationBuilder() {
 
   // Edit Mode State
   const [editingQuotationId, setEditingQuotationId] = useState<string | null>(null);
+  const [editingQuoteNumber, setEditingQuoteNumber] = useState<string | null>(null);
   const [editLoaded, setEditLoaded] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -353,6 +354,7 @@ function QuotationBuilder() {
 
         const q = result.data;
         setEditingQuotationId(q.id);
+        setEditingQuoteNumber(q.quote_number || null);
 
         // If form_data is saved (full form snapshot), use it for exact restoration
         const fd = q.form_data;
@@ -865,6 +867,7 @@ function QuotationBuilder() {
     // Clear edit mode
     if (editingQuotationId) {
       setEditingQuotationId(null);
+      setEditingQuoteNumber(null);
       setEditLoaded(false);
       router.push('/', { scroll: false });
     }
@@ -959,8 +962,8 @@ function QuotationBuilder() {
           terms: effectiveTerms,
           components: effectiveComponents,
           salesperson: activeCompany.authorizedSignatory,
-          pdf_url: pdfUrl,
-          pdf_storage_path: pdfStoragePath,
+          pdf_url: pdfUrl ?? null,
+          pdf_storage_path: pdfStoragePath ?? null,
           status: status,
           form_data: getFormDataSnapshot(),
         })
@@ -1050,6 +1053,7 @@ function QuotationBuilder() {
         terms: b2bTerms,
         companyDetails: activeCompany,
         vendor_id: activeCompany.id,
+        quote_number: editingQuoteNumber || b2bRefNumber,
         skipWhatsApp: options?.skipWhatsApp ?? true,
       };
     }
@@ -1090,6 +1094,7 @@ function QuotationBuilder() {
       terms,
       companyDetails: activeCompany,
       vendor_id: activeCompany.id,
+      quote_number: editingQuoteNumber || quoteNumber,
       skipWhatsApp: options?.skipWhatsApp ?? true,
     };
   };
@@ -1185,9 +1190,9 @@ function QuotationBuilder() {
         ? serviceRefNumber
         : (savedRecord?.quote_number || quoteNumber || "Quote");
 
-      // Mask raw Supabase BaaS storage URL behind your branded website domain
+      // Mask raw Supabase BaaS storage URL behind your branded website domain with fresh cache-buster
       const brandedPdfUrl = (savedRecord?.quote_number || savedRecord?.id)
-        ? `${origin}/api/quote/view/${encodeURIComponent(savedRecord.quote_number || savedRecord.id)}`
+        ? `${origin}/api/quote/view/${encodeURIComponent(savedRecord.quote_number || savedRecord.id)}?v=${Date.now()}`
         : (pdfUrl || undefined);
 
       const messageText = buildQuoteWhatsAppMessage({
